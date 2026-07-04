@@ -3,6 +3,13 @@
 //  IOS_Tutorial
 //
 //  Created by Student4 on 2026-06-30.
+
+
+//
+//  QuizRushView.swift
+//  IOS_Tutorial
+//
+//  Created by Student4 on 2026-06-30.
 //
 
 import SwiftUI
@@ -10,242 +17,192 @@ import SwiftUI
 struct QuizRushView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = QuizViewModel()
-    @State private var showErrorAlert = false
     @AppStorage("quizRushHighScore") private var highScore = 0
+    
     var body: some View {
         VStack {
             // Header
-            QuizHeaderView(
-                onBack: { dismiss() },
-                score: viewModel.score
-            )
+            HStack {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "arrow.left")
+                        .font(.title2)
+                }
+                Spacer()
+                Text("Quiz Rush")
+                    .font(.headline)
+                Spacer()
+                HStack {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                    Text("\(viewModel.score)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.blue.opacity(0.1)))
+            }
+            .padding()
             
             // Content
-            contentView
+            if viewModel.state == .loading {
+                VStack {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading Questions...")
+                        .padding()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if viewModel.state == .loaded, let question = viewModel.currentQuestion {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Progress
+                        HStack {
+                            Text("Question \(viewModel.currentIndex + 1) of 10")
+                            Spacer()
+                            if viewModel.streak > 0 {
+                                HStack {
+                                    Image(systemName: "flame.fill")
+                                        .foregroundColor(.orange)
+                                    Text("\(viewModel.streak)")
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Question
+                        VStack(spacing: 12) {
+                            Text(question.category)
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(8)
+                            
+                            Text(question.question)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .multilineTextAlignment(.center)
+                                .padding()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(radius: 5)
+                        .padding(.horizontal)
+                        
+                        // Answers
+                        ForEach(question.allAnswers, id: \.self) { answer in
+                            Button(action: {
+                                viewModel.selectAnswer(answer)
+                            }) {
+                                Text(answer)
+                                    .font(.body)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(buttonColor(answer))
+                                    .foregroundColor(.primary)
+                                    .cornerRadius(12)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(buttonBorder(answer), lineWidth: 2)
+                                    )
+                            }
+                            .disabled(viewModel.isAnswering)
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding(.vertical)
+                }
+            } else if viewModel.state == .finished {
+                // Finished
+                VStack(spacing: 25) {
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.yellow)
+                    Text("Quiz Complete!")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Text("Score: \(viewModel.score)")
+                        .font(.title)
+                    Text("Best Streak: \(viewModel.streak)")
+                        .font(.headline)
+                    
+                    Button(action: {
+                        viewModel.reset()
+                        Task {
+                            await viewModel.loadQuestions()
+                        }
+                    }) {
+                        Text("Play Again")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                    }
+                    .padding(.horizontal)
+                    
+                    Button(action: { dismiss() }) {
+                        Text("Home")
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding()
+                .onAppear {
+                    if viewModel.score > highScore {
+                        highScore = viewModel.score
+                    }
+                }
+            } else {
+                // Idle or error - show start button
+                VStack {
+                    Text("Ready to play?")
+                        .font(.title2)
+                    Button(action: {
+                        Task {
+                            await viewModel.loadQuestions()
+                        }
+                    }) {
+                        Text("Start Quiz")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 50)
+                }
+            }
         }
         .task {
             await viewModel.loadQuestions()
         }
-        .onChange(of: viewModel.viewState) { newState in
-            if case .failed(let error) = newState {
-                showErrorAlert = true
-            }
-        }
-        .alert("Error", isPresented: $showErrorAlert) {
-            Button("Retry") {
-                Task {
-                    await viewModel.loadQuestions()
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                dismiss()
-            }
-        } message: {
-            if case .failed(let error) = viewModel.viewState {
-                Text(error.localizedDescription)
-            }
-        }
     }
     
-    @ViewBuilder
-    private var contentView: some View {
-        switch viewModel.viewState {
-        case .idle:
-            Color.clear
-            
-        case .loading:
-            QuizLoadingView()
-            
-        case .loaded:
-            if let question = viewModel.currentQuestion {
-                QuizQuestionView(
-                    question: question,
-                    currentIndex: viewModel.currentIndex,
-                    totalQuestions: viewModel.questions.count,
-                    streak: viewModel.streak,
-                    selectedAnswer: viewModel.selectedAnswer,
-                    answerState: viewModel.answerState,
-                    isAnswering: viewModel.isAnswering,
-                    onAnswerSelected: { answer in
-                        viewModel.selectAnswer(answer)
-                    }
-                )
+    func buttonColor(_ answer: String) -> Color {
+        if viewModel.selectedAnswer == answer {
+            if viewModel.answerState == .correct {
+                return Color.green.opacity(0.3)
+            } else if viewModel.answerState == .wrong {
+                return Color.red.opacity(0.3)
             }
-            
-        case .failed:
-            QuizErrorView(
-                error: QuizServiceError.noData,
-                onRetry: {
-                    Task {
-                        await viewModel.loadQuestions()
-                    }
-                }
-            )
-            
-        case .finished:
-            QuizFinishedView(
-                score: viewModel.score,
-                maxStreak: viewModel.maxStreak,
-                totalQuestions: viewModel.questions.count,
-                onPlayAgain: {
-                    viewModel.resetQuiz()
-                    Task {
-                        await viewModel.loadQuestions()
-                    }
-                },
-                onHome: {
-                    dismiss()
-                }
-            )
+            return Color.blue.opacity(0.2)
         }
-    }
-}
-
-// MARK: - Quiz Header
-struct QuizHeaderView: View {
-    let onBack: () -> Void
-    let score: Int
-    
-    var body: some View {
-        HStack {
-            Button(action: onBack) {
-                Image(systemName: "arrow.left")
-                    .font(.title2)
-            }
-            
-            Spacer()
-            
-            Text("Quiz Rush")
-                .font(.headline)
-            
-            Spacer()
-            
-            QuizScoreView(score: score)
-        }
-        .padding()
-    }
-}
-
-// MARK: - Quiz Question View
-struct QuizQuestionView: View {
-    let question: Question
-    let currentIndex: Int
-    let totalQuestions: Int
-    let streak: Int
-    let selectedAnswer: String?
-    let answerState: AnswerState
-    let isAnswering: Bool
-    let onAnswerSelected: (String) -> Void
-    
-    @State private var isQuestionVisible = false
-    @State private var isOptionsVisible = false
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Progress
-                QuestionProgressView(
-                    current: currentIndex,
-                    total: totalQuestions,
-                    streak: streak
-                )
-                .padding(.horizontal)
-                
-                // Question Card
-                VStack(spacing: 16) {
-                    // Category Badge
-                    Text(question.category.decodedHTML)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(8)
-                    
-                    // Difficulty Badge
-                    Text(question.difficulty.capitalized)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(difficultyColor.opacity(0.2))
-                        .cornerRadius(8)
-                        .foregroundColor(difficultyColor)
-                    
-                    // Question Text
-                    Text(question.question.decodedHTML)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .multilineTextAlignment(.center)
-                        .padding(.vertical, 8)
-                        .opacity(isQuestionVisible ? 1 : 0)
-                        .offset(y: isQuestionVisible ? 0 : 20)
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color(.systemBackground))
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-                .padding(.horizontal)
-                
-                // Answer Options
-                VStack(spacing: 12) {
-                    ForEach(question.allAnswers, id: \.self) { answer in
-                        AnswerButton(
-                            text: answer.decodedHTML,
-                            isSelected: selectedAnswer == answer,
-                            state: selectedAnswer == answer ? answerState : .none
-                        ) {
-                            if !isAnswering {
-                                onAnswerSelected(answer)
-                            }
-                        }
-                        .opacity(isOptionsVisible ? 1 : 0)
-                        .offset(x: isOptionsVisible ? 0 : -20)
-                    }
-                }
-                .padding(.horizontal)
-            }
-            .padding(.vertical)
-        }
-        .onAppear {
-            // Animate question appearance
-            withAnimation(.easeOut(duration: 0.5)) {
-                isQuestionVisible = true
-            }
-            // Animate options with staggered delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    isOptionsVisible = true
-                }
-            }
-        }
-        .onChange(of: currentIndex) { _ in
-            // Reset animations when question changes
-            isQuestionVisible = false
-            isOptionsVisible = false
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeOut(duration: 0.5)) {
-                    isQuestionVisible = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        isOptionsVisible = true
-                    }
-                }
-            }
-        }
+        return Color.gray.opacity(0.1)
     }
     
-    private var difficultyColor: Color {
-        switch question.difficulty {
-        case "easy":
-            return .green
-        case "medium":
-            return .orange
-        default:
-            return .red
+    func buttonBorder(_ answer: String) -> Color {
+        if viewModel.selectedAnswer == answer {
+            if viewModel.answerState == .correct {
+                return .green
+            } else if viewModel.answerState == .wrong {
+                return .red
+            }
+            return .blue
         }
+        return Color.clear
     }
 }

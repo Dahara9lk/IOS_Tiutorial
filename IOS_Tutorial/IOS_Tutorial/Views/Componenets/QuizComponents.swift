@@ -5,6 +5,7 @@
 //  Created by Student4 on 2026-06-30.
 //
 
+
 import SwiftUI
 
 // MARK: - Question Progress View
@@ -30,24 +31,6 @@ struct QuestionProgressView: View {
                 .foregroundColor(.orange)
             }
         }
-    }
-}
-
-// MARK: - Quiz Score View
-struct QuizScoreView: View {
-    let score: Int
-    
-    var body: some View {
-        HStack {
-            Image(systemName: "star.fill")
-                .foregroundColor(.yellow)
-            Text("\(score)")
-                .font(.title2)
-                .fontWeight(.bold)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(Color.blue.opacity(0.1)))
     }
 }
 
@@ -113,7 +96,7 @@ struct AnswerButton: View {
     }
 }
 
-// MARK: - Loading State View
+// MARK: - Loading View
 struct QuizLoadingView: View {
     var body: some View {
         VStack(spacing: 20) {
@@ -130,7 +113,7 @@ struct QuizLoadingView: View {
     }
 }
 
-// MARK: - Error State View
+// MARK: - Error View
 struct QuizErrorView: View {
     let error: Error
     let onRetry: () -> Void
@@ -169,7 +152,7 @@ struct QuizErrorView: View {
     }
 }
 
-// MARK: - Quiz Finished View
+// MARK: - Finished View
 struct QuizFinishedView: View {
     let score: Int
     let maxStreak: Int
