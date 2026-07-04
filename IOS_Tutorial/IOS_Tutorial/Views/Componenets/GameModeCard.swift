@@ -12,9 +12,18 @@ struct GameModeCard: View {
     let subtitle: String
     let highScore: Int
     let color: Color
+    let iconName: String
     
     var body: some View {
         HStack {
+            // Icon
+            Image(systemName: iconName)
+                .font(.title)
+                .foregroundColor(.white)
+                .frame(width: 50, height: 50)
+                .background(Color.white.opacity(0.2))
+                .clipShape(Circle())
+            
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
                     .font(.title2)
@@ -27,7 +36,10 @@ struct GameModeCard: View {
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.9))
             }
+            .padding(.leading, 4)
+            
             Spacer()
+            
             Image(systemName: "chevron.right")
                 .foregroundColor(.white.opacity(0.5))
         }

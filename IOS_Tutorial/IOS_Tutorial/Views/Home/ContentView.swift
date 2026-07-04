@@ -20,7 +20,7 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 25) {
-                Text("BSCCOMP25.1P")
+                Text("GAME TIME")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .padding(.top, 40)
@@ -30,7 +30,6 @@ struct ContentView: View {
                     .foregroundColor(.gray)
                     .padding(.bottom, 10)
                 
-                // Game Mode Buttons
                 Button(action: { selectedMode = .tapFrenzy }) {
                     GameModeCard(
                         title: "Tap Frenzy",
@@ -75,50 +74,6 @@ struct ContentView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Updated Game Mode Card
-struct GameModeCard: View {
-    let title: String
-    let subtitle: String
-    let highScore: Int
-    let color: Color
-    let iconName: String
-    
-    var body: some View {
-        HStack {
-            // Icon
-            Image(systemName: iconName)
-                .font(.title)
-                .foregroundColor(.white)
-                .frame(width: 50, height: 50)
-                .background(Color.white.opacity(0.2))
-                .clipShape(Circle())
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-                Text("High Score: \(highScore)")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.9))
-            }
-            .padding(.leading, 4)
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.white.opacity(0.5))
-        }
-        .padding()
-        .background(color.gradient)
-        .cornerRadius(15)
-        .shadow(radius: 5)
     }
 }
 
