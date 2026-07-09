@@ -9,7 +9,7 @@
 import SwiftUI
 import Combine
 
-class QuizViewModel: ObservableObject {
+class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is remaing the same
     @Published var questions: [Question] = []
     @Published var currentIndex = 0
     @Published var score = 0

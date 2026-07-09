@@ -9,6 +9,12 @@ import SwiftUI
 
 struct LightItUpView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var statsVM: StatsViewModel
+    @EnvironmentObject var locationService: LocationService
+    
+    // Storage of the App
+    @AppStorage("lightItUpHighScore") private var highScore = 0
+    
     @State private var cards: [Card] = []
     @State private var score = 0
     @State private var lives = 3
@@ -22,244 +28,286 @@ struct LightItUpView: View {
     @State private var selectedDuration = 60
     @State private var showSettings = false
     
-    @AppStorage("lightItUpHighScore") private var highScore = 0
+    
+    
     
     let durationOptions = [30, 60, 90]
     
+    //Body
     var body: some View {
-        VStack {
-            // Header
-            HStack {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "arrow.left")
-                        .font(.title2)
+            VStack {
+                // Header
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "arrow.left")
+                            .font(.title2)
+                    }
+                    
+                    Spacer()
+                    
+                    Text("Light It Up")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    Button(action: { showSettings.toggle() }) {
+                        Image(systemName: "gear")
+                            .font(.title2)
+                    }
                 }
+                .padding()
                 
-                Spacer()
+                // Stats
+                HStack {
+                    VStack {
+                        Text("Score")
+                            .font(.caption)
+                        Text("\(score)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text("Lives")
+                            .font(.caption)
+                        HStack {
+                            ForEach(0..<3, id: \.self) { index in
+                                Image(systemName: index < lives ? "heart.fill" : "heart")
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text("Time")
+                            .font(.caption)
+                        Text("\(timeRemaining)s")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(timeRemaining <= 10 ? .red : .primary)
+                    }
+                }
+                .padding(.horizontal)
                 
-                Text("Light It Up")
+                // Level Indicator
+                Text("Level \(currentLevel.rawValue)")
                     .font(.headline)
+                    .foregroundColor(currentLevel.glowColor)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 15)
+                    .background(currentLevel.glowColor.opacity(0.2))
+                    .cornerRadius(10)
                 
-                Spacer()
+                // Grid
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: currentLevel.columns), spacing: 8) {
+                    ForEach(cards) { card in
+                        CardView(card: card, level: currentLevel)
+                            .onTapGesture {
+                                handleTap(card: card)
+                            }
+                    }
+                }
+                .padding()
+                .frame(maxHeight: .infinity)
                 
-                Button(action: { showSettings.toggle() }) {
-                    Image(systemName: "gear")
-                        .font(.title2)
+                // Start Button
+                if !isGameActive && !showGameOver {
+                    Button(action: startGame) {
+                        Text("Start Game")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(15)
+                    }
+                    .padding()
                 }
             }
-            .padding()
-            
-            // Stats
-            HStack {
-                VStack {
-                    Text("Score")
-                        .font(.caption)
-                    Text("\(score)")
-                        .font(.title2)
-                        .fontWeight(.bold)
+            .sheet(isPresented: $showSettings) {
+                SettingsSheet(selectedDuration: $selectedDuration)
+            }
+            .overlay(
+                Group {
+                    if showLevelUp {
+                        LevelUpOverlay(level: currentLevel)
+                    }
+                    if showGameOver {
+                        ResultView(
+                            score: score,
+                            mode: .lightItUp,
+                            onPlayAgain: startGame,
+                            onHome: { dismiss() }
+                        )
+                    }
                 }
+            )
+            .onDisappear {
+                stopGame()
+            }
+        }
+        
+        // MARK: - Game Logic
+        private func initializeCards() {
+            cards = (0..<currentLevel.totalCards).map { Card(position: $0) }
+        }
+        
+        private func startGame() {
+            score = 0
+            lives = 3
+            timeRemaining = selectedDuration
+            currentLevel = .l1
+            initializeCards()
+            isGameActive = true
+            showGameOver = false
+            showLevelUp = false
+            
+            startMainTimer()
+            startLitTimer()
+        }
+        
+        private func stopGame() {
+            timer?.invalidate()
+            litTimer?.invalidate()
+            timer = nil
+            litTimer = nil
+            isGameActive = false
+            
+            // Turn off all lights
+            for i in cards.indices {
+                cards[i].isLit = false
+            }
+        }
+        
+        private func startMainTimer() {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+                timeRemaining -= 1
                 
-                Spacer()
-                
-                VStack {
-                    Text("Lives")
-                        .font(.caption)
-                    HStack {
-                        ForEach(0..<3, id: \.self) { index in
-                            Image(systemName: index < lives ? "heart.fill" : "heart")
-                                .foregroundColor(.red)
-                        }
+                // Check level progression
+                let newLevel = Level.from(time: selectedDuration - timeRemaining)
+                if newLevel != currentLevel {
+                    withAnimation(.spring()) {
+                        currentLevel = newLevel
+                        showLevelUp = true
+                        initializeCards()
+                        startLitTimer()
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        showLevelUp = false
                     }
                 }
                 
-                Spacer()
+                if timeRemaining <= 0 {
+                    endGame()
+                }
+            }
+        }
+        
+        private func startLitTimer() {
+            litTimer?.invalidate()
+            litTimer = Timer.scheduledTimer(withTimeInterval: currentLevel.litDuration, repeats: true) { _ in
+                if isGameActive {
+                    lightUpCards()
+                }
+            }
+        }
+        
+        private func lightUpCards() {
+            // Turn off all cards
+            for i in cards.indices {
+                cards[i].isLit = false
+            }
+            
+            // Pick cards to light up
+            let availableIndices = cards.indices.filter { !cards[$0].isLit }
+            let countToLight = min(currentLevel.litCount, availableIndices.count)
+            
+            if countToLight > 0 {
+                let shuffledIndices = availableIndices.shuffled()
+                for i in 0..<countToLight {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        cards[shuffledIndices[i]].isLit = true
+                    }
+                }
+            }
+        }
+        
+        private func handleTap(card: Card) {
+            guard isGameActive else { return }
+            
+            if card.isLit {
+                // Correct tap
+                score += 1
+                withAnimation(.easeOut(duration: 0.2)) {
+                    if let index = cards.firstIndex(where: { $0.id == card.id }) {
+                        cards[index].isLit = false
+                    }
+                }
+                // Haptic feedback
+                let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.impactOccurred()
+            } else {
+                // Wrong tap - lose a life
+                lives -= 1
+                let generator = UIImpactFeedbackGenerator(style: .heavy)
+                generator.impactOccurred()
                 
-                VStack {
-                    Text("Time")
-                        .font(.caption)
-                    Text("\(timeRemaining)s")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(timeRemaining <= 10 ? .red : .primary)
+                if lives <= 0 {
+                    endGame()
                 }
-            }
-            .padding(.horizontal)
-            
-            // Level Indicator
-            Text("Level \(currentLevel.rawValue)")
-                .font(.headline)
-                .foregroundColor(currentLevel.glowColor)
-                .padding(.vertical, 5)
-                .padding(.horizontal, 15)
-                .background(currentLevel.glowColor.opacity(0.2))
-                .cornerRadius(10)
-            
-            // Grid
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: currentLevel.columns), spacing: 8) {
-                ForEach(cards) { card in
-                    CardView(card: card, level: currentLevel)
-                        .onTapGesture {
-                            handleTap(card: card)
-                        }
-                }
-            }
-            .padding()
-            .frame(maxHeight: .infinity)
-            
-            // Start Button
-            if !isGameActive {
-                Button(action: startGame) {
-                    Text("Start Game")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(15)
-                }
-                .padding()
             }
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsSheet(selectedDuration: $selectedDuration)
-        }
-        .overlay(
-            Group {
-                if showLevelUp {
-                    LevelUpOverlay(level: currentLevel)
-                }
-                if showGameOver {
-                    GameOverOverlay(
-                        score: score,
-                        highScore: highScore,
-                        isNewHighScore: score > highScore,
-                        onRestart: startGame,
-                        onHome: { dismiss() }
-                    )
-                }
-            }
-        )
-        .onDisappear {
+        
+        private func endGame() {
             stopGame()
-        }
-    }
-    
-    private func initializeCards() {
-        cards = (0..<currentLevel.totalCards).map { Card(position: $0) }
-    }
-    
-    private func startGame() {
-        score = 0
-        lives = 3
-        timeRemaining = selectedDuration
-        currentLevel = .l1
-        initializeCards()
-        isGameActive = true
-        showGameOver = false
-        showLevelUp = false
-        
-        startMainTimer()
-        startLitTimer()
-    }
-    
-    private func stopGame() {
-        timer?.invalidate()
-        litTimer?.invalidate()
-        timer = nil
-        litTimer = nil
-        isGameActive = false
-        
-        // Turn off all lights
-        for i in cards.indices {
-            cards[i].isLit = false
-        }
-    }
-    
-    private func startMainTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            timeRemaining -= 1
             
-            // Check level progression
-            let newLevel = Level.from(time: selectedDuration - timeRemaining)
-            if newLevel != currentLevel {
-                withAnimation(.spring()) {
-                    currentLevel = newLevel
-                    showLevelUp = true
-                    initializeCards()
-                    // Restart lit timer with new level
-                    startLitTimer()
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    showLevelUp = false
-                }
+            // Update high score
+            if score > highScore {
+                highScore = score
             }
             
-            if timeRemaining <= 0 {
-                endGame()
-            }
-        }
-    }
-    
-    private func startLitTimer() {
-        litTimer?.invalidate()
-        litTimer = Timer.scheduledTimer(withTimeInterval: currentLevel.litDuration, repeats: true) { _ in
-            if isGameActive {
-                lightUpCards()
-            }
-        }
-    }
-    
-    private func lightUpCards() {
-        // Turn off all cards
-        for i in cards.indices {
-            cards[i].isLit = false
-        }
-        
-        // Pick cards to light up
-        let availableIndices = cards.indices.filter { !cards[$0].isLit }
-        let countToLight = min(currentLevel.litCount, availableIndices.count)
-        
-        if countToLight > 0 {
-            let shuffledIndices = availableIndices.shuffled()
-            for i in 0..<countToLight {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    cards[shuffledIndices[i]].isLit = true
-                }
-            }
-        }
-    }
-    
-    private func handleTap(card: Card) {
-        guard isGameActive else { return }
-        
-        if card.isLit {
-            // Correct tap
-            score += 1
-            withAnimation(.easeOut(duration: 0.2)) {
-                if let index = cards.firstIndex(where: { $0.id == card.id }) {
-                    cards[index].isLit = false
-                }
-            }
-        } else {
-            // Wrong tap - lose a life
-            lives -= 1
-            // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .heavy)
-            generator.impactOccurred()
+            // Record session
+            let session = GameSession(
+                mode: .lightItUp,
+                score: score,
+                latitude: locationService.currentLocation?.coordinate.latitude,
+                longitude: locationService.currentLocation?.coordinate.longitude
+            )
+            statsVM.addSession(session)
             
-            if lives <= 0 {
-                endGame()
-            }
+            showGameOver = true
         }
     }
-    
-    private func endGame() {
-        stopGame()
-        if score > highScore {
-            highScore = score
+
+    // MARK: - Card View
+    struct CardView: View {
+        let card: Card
+        let level: Level
+        
+        var body: some View {
+            Rectangle()
+                .fill(card.isLit ? level.glowColor : Color.gray.opacity(0.3))
+                .aspectRatio(1, contentMode: .fit)
+                .cornerRadius(12)
+                .scaleEffect(card.isLit ? 1.05 : 1.0)
+                .animation(.easeInOut(duration: 0.3), value: card.isLit)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(card.isLit ? level.glowColor : Color.clear, lineWidth: 3)
+                        .shadow(color: card.isLit ? level.glowColor.opacity(0.5) : .clear, radius: 8)
+                )
         }
-        showGameOver = true
     }
-}
+
+    #Preview {
+        LightItUpView()
+            .environmentObject(StatsViewModel())
+            .environmentObject(LocationService())
+    }
