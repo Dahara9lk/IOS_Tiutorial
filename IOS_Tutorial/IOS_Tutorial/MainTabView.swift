@@ -46,7 +46,7 @@ struct MainTabView: View {
                     locationService.requestPermission()
                     
                     // Request notification permission
-                    let notificationService = NotificationService()
+                    let notificationService = NotificationService.shared
                     notificationService.requestPermission()
                 }
             }
@@ -57,4 +57,3 @@ struct MainTabView: View {
         }
         
     
-

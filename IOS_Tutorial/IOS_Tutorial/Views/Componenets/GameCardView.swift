@@ -7,7 +7,8 @@
 
 import SwiftUI
 
-struct CardView: View {
+// ✅ Renamed from CardView to GameCardView to avoid conflict
+struct GameCardView: View {
     let card: Card
     let level: Level
     

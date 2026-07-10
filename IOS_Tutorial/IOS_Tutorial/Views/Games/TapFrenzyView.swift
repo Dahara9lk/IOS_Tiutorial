@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct TapFrenzyView: View {
     @Environment(\.dismiss) private var dismiss

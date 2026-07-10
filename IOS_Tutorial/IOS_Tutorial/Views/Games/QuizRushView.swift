@@ -6,6 +6,7 @@
 
 
 import SwiftUI
+import CoreLocation
 
 struct QuizRushView: View {
     // Environment
@@ -17,8 +18,6 @@ struct QuizRushView: View {
     //Storage of the App
     @AppStorage("quizRushHighScore") private var highScore = 0
     
-    //State
-    @StateObject private var viewModel = QuizRushVM()
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     @State private var isRecordingSession = false
@@ -61,13 +60,7 @@ struct QuizRushView: View {
             .task {
                 await viewModel.loadQuestions()
             }
-            .onChange(of: viewModel.state) { newState in
-                if case .failed(let error) = newState {
-                    errorMessage = error.localizedDescription
-                    showErrorAlert = true
-                    print("❌ Error: \(error)")
-                }
-                
+            .onChange(of: viewModel.state) { oldState, newState in
                 // Record session when quiz finishes
                 if newState == .finished && !isRecordingSession {
                     isRecordingSession = true

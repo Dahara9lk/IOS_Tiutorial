@@ -7,10 +7,12 @@
 
 import Foundation
 import CoreLocation
+import MapKit
 
+// MARK: - Game Session Model
 struct GameSession: Identifiable, Codable {
     let id: UUID
-    let mode: GameMode
+    let mode: GameMode      // ✅ Uses GameMode from GameMode.swift
     let score: Int
     let timestamp: Date
     let latitude: Double?
@@ -25,12 +27,14 @@ struct GameSession: Identifiable, Codable {
         self.longitude = longitude
     }
     
-    // Helper to get coordinate for MapKit
-    var coordinate: CLLocationCoordinate2D? {
+    // Computed property to get coordinates
+    var locationCoordinate: CLLocationCoordinate2D? {
         guard let lat = latitude, let lon = longitude else { return nil }
         return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 }
+
+// MARK: - UserDefaults Extension
 extension UserDefaults {
     private static let sessionsKey = "gameSessions"
     

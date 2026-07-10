@@ -26,6 +26,24 @@ class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is r
         return questions[currentIndex]
     }
     
+    var showFeedback: Bool {
+        answerState != .none
+    }
+    
+    var feedbackMessage: String {
+        switch answerState {
+        case .correct:
+            return "Correct! \(streak >= 2 ? "Streak: \(streak)!" : "")"
+        case .wrong:
+            if let question = currentQuestion {
+                return "Wrong! Correct answer: \(question.correct_answer.decodedHTML)"
+            }
+            return "Wrong!"
+        case .none:
+            return ""
+        }
+    }
+    
     @MainActor
     func loadQuestions() async {
         state = .loading
