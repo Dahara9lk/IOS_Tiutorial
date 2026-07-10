@@ -13,9 +13,11 @@ enum QuizServiceError: Error {
 }
 
 class QuizService {
-    func fetchQuestions() async throws -> [Question] {
-        // Use this URL - it works!
-        let urlString = "https://opentdb.com/api.php?amount=10&type=multiple"
+    func fetchQuestions(categoryID: Int? = nil) async throws -> [Question] {
+        var urlString = "https://opentdb.com/api.php?amount=10&type=multiple"
+        if let categoryID = categoryID {
+            urlString += "&category=\(categoryID)"
+        }
         
         guard let url = URL(string: urlString) else {
             throw QuizServiceError.noData
