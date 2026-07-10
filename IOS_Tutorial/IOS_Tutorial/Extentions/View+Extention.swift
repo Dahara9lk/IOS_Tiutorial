@@ -1,23 +1,26 @@
 //
-//  View+Extensions.swift
+//  String+Extensions.swift
 //  IOS_Tutorial
 //
-//  Created by Student4 on 2026-06-17.
+//  Created by Student4 on 2026-07-10.
 //
 
-import SwiftUI
+import Foundation
+import UIKit
 
-// This file can contain reusable view modifiers
-// For example:
-extension View {
-    func gameButtonStyle() -> some View {
-        self
-            .font(.title3)
-            .fontWeight(.semibold)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.blue)
-            .cornerRadius(15)
+extension String {
+    var decodedHTML: String {
+        guard let data = data(using: .utf8) else { return self }
+        
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue
+        ]
+        
+        guard let attributedString = try? NSAttributedString(data: data, options: options, documentAttributes: nil) else {
+            return self
+        }
+        
+        return attributedString.string
     }
 }

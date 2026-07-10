@@ -9,7 +9,7 @@
 import SwiftUI
 import Combine
 
-class QuizViewModel: ObservableObject {
+class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is remaing the same
     @Published var questions: [Question] = []
     @Published var currentIndex = 0
     @Published var score = 0
@@ -24,6 +24,24 @@ class QuizViewModel: ObservableObject {
     var currentQuestion: Question? {
         guard currentIndex < questions.count else { return nil }
         return questions[currentIndex]
+    }
+    
+    var showFeedback: Bool {
+        answerState != .none
+    }
+    
+    var feedbackMessage: String {
+        switch answerState {
+        case .correct:
+            return "Correct! \(streak >= 2 ? "Streak: \(streak)!" : "")"
+        case .wrong:
+            if let question = currentQuestion {
+                return "Wrong! Correct answer: \(question.correct_answer.decodedHTML)"
+            }
+            return "Wrong!"
+        case .none:
+            return ""
+        }
     }
     
     @MainActor

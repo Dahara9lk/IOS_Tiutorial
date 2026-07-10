@@ -6,9 +6,16 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct LightItUpView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var statsVM: StatsViewModel
+    @EnvironmentObject var locationService: LocationService
+    
+    // Storage of the App
+    @AppStorage("lightItUpHighScore") private var highScore = 0
+    
     @State private var cards: [Card] = []
     @State private var score = 0
     @State private var lives = 3
@@ -22,10 +29,9 @@ struct LightItUpView: View {
     @State private var selectedDuration = 60
     @State private var showSettings = false
     
-    @AppStorage("lightItUpHighScore") private var highScore = 0
-    
     let durationOptions = [30, 60, 90]
     
+    //Body
     var body: some View {
         VStack {
             // Header
@@ -57,6 +63,7 @@ struct LightItUpView: View {
                     Text("\(score)")
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundColor(.blue)
                 }
                 
                 Spacer()
@@ -94,10 +101,10 @@ struct LightItUpView: View {
                 .background(currentLevel.glowColor.opacity(0.2))
                 .cornerRadius(10)
             
-            // Grid
+            // Grid - ✅ Using LightItUpCardView from CardView.swift
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: currentLevel.columns), spacing: 8) {
                 ForEach(cards) { card in
-                    CardView(card: card, level: currentLevel)
+                    GameCardView(card: card, level: currentLevel)  // ✅ Updated name
                         .onTapGesture {
                             handleTap(card: card)
                         }
@@ -107,7 +114,7 @@ struct LightItUpView: View {
             .frame(maxHeight: .infinity)
             
             // Start Button
-            if !isGameActive {
+            if !isGameActive && !showGameOver {
                 Button(action: startGame) {
                     Text("Start Game")
                         .font(.title3)
@@ -130,11 +137,10 @@ struct LightItUpView: View {
                     LevelUpOverlay(level: currentLevel)
                 }
                 if showGameOver {
-                    GameOverOverlay(
+                    ResultView(
                         score: score,
-                        highScore: highScore,
-                        isNewHighScore: score > highScore,
-                        onRestart: startGame,
+                        mode: .lightItUp,
+                        onPlayAgain: startGame,
                         onHome: { dismiss() }
                     )
                 }
@@ -145,6 +151,7 @@ struct LightItUpView: View {
         }
     }
     
+    // MARK: - Game Logic
     private func initializeCards() {
         cards = (0..<currentLevel.totalCards).map { Card(position: $0) }
     }
@@ -188,7 +195,6 @@ struct LightItUpView: View {
                     currentLevel = newLevel
                     showLevelUp = true
                     initializeCards()
-                    // Restart lit timer with new level
                     startLitTimer()
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -242,10 +248,12 @@ struct LightItUpView: View {
                     cards[index].isLit = false
                 }
             }
+            // Haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
         } else {
             // Wrong tap - lose a life
             lives -= 1
-            // Haptic feedback
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.impactOccurred()
             
@@ -257,9 +265,28 @@ struct LightItUpView: View {
     
     private func endGame() {
         stopGame()
+        
+        // Update high score
         if score > highScore {
             highScore = score
         }
+        
+        // Record session
+        let session = GameSession(
+            mode: .lightItUp,
+            score: score,
+            latitude: locationService.currentLocation?.coordinate.latitude,
+            longitude: locationService.currentLocation?.coordinate.longitude
+        )
+        statsVM.addSession(session)
+        
         showGameOver = true
     }
+}
+
+
+#Preview {
+    LightItUpView()
+        .environmentObject(StatsViewModel())
+        .environmentObject(LocationService())
 }
