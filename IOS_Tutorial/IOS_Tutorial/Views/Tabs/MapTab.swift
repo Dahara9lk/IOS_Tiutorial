@@ -16,9 +16,8 @@ struct MapTab: View {
     @State private var selectedSession: GameSession?
     @State private var isTracking = true
     @State private var refreshID = UUID()
-    @State private var fixedLocation: CLLocationCoordinate2D?
     
-    // ✅ NIBM Colombo, Sri Lanka - CORRECT COORDINATES
+    // NIBM Colombo, Sri Lanka - Correct Coordinates
     private let nibmLocation = CLLocationCoordinate2D(
         latitude: 6.90644,
         longitude: 79.87079
@@ -26,191 +25,176 @@ struct MapTab: View {
     
     var body: some View {
         NavigationStack {
-            Map(position: $position) {
-                // LIVE USER LOCATION - FIXED
-                if let location = locationService.currentLocation {
-                    // ✅ Fix: Check if longitude is negative (wrong hemisphere)
-                    let lat = location.coordinate.latitude
-                    let lon = abs(location.coordinate.longitude) // ✅ Make positive
-                    let fixedCoord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                    
-                    Annotation("You are here", coordinate: fixedCoord) {
-                        UserLocationPin()
-                    }
-                }
-                
-                // ✅ NIBM Pin (always visible)
-                Annotation("NIBM Sri Lanka", coordinate: nibmLocation) {
-                    NIBMPin()
-                }
-                
-                // GAME SESSION PINS
-                ForEach(statsVM.sessions) { session in
-                    if let coordinate = session.locationCoordinate {
-                        // ✅ Also fix game session coordinates
-                        let fixedCoord = CLLocationCoordinate2D(
-                            latitude: coordinate.latitude,
-                            longitude: abs(coordinate.longitude)
-                        )
-                        Annotation(
-                            "",
-                            coordinate: fixedCoord,
-                            anchor: .center
-                        ) {
-                            GameSessionPin(session: session)
-                                .onTapGesture {
-                                    selectedSession = session
-                                }
-                        }
-                    }
-                }
-            }
-            .mapControls {
-                MapUserLocationButton()
-                MapCompass()
-                MapScaleView()
-            }
-            .mapStyle(.standard)
-            .onAppear {
-                print("📍 Map appeared - Sessions: \(statsVM.sessions.count)")
-                statsVM.loadSessions()
-                locationService.startUpdating()
-                
-                // ✅ Log location for debugging
-                if let location = locationService.currentLocation {
-                    print("📍 User location (raw): \(location.coordinate.latitude), \(location.coordinate.longitude)")
-                    print("📍 User location (fixed): \(location.coordinate.latitude), \(abs(location.coordinate.longitude))")
-                }
-                print("📍 NIBM location: \(nibmLocation.latitude), \(nibmLocation.longitude)")
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            ZStack {
+                Map(position: $position) {
+                    // LIVE USER LOCATION
                     if let location = locationService.currentLocation {
-                        let fixedCoord = CLLocationCoordinate2D(
-                            latitude: location.coordinate.latitude,
-                            longitude: abs(location.coordinate.longitude)
+                        Annotation("You are here", coordinate: location.coordinate) {
+                            UserLocationPin()
+                        }
+                    }
+                    
+                    // NIBM Pin
+                    Annotation("NIBM Sri Lanka", coordinate: nibmLocation) {
+                        NIBMPin()
+                    }
+                    
+                    // GAME SESSION PINS
+                    ForEach(statsVM.sessions) { session in
+                        if let coordinate = session.locationCoordinate {
+                            Annotation(
+                                "",
+                                coordinate: coordinate,
+                                anchor: .center
+                            ) {
+                                GameSessionPin(session: session)
+                                    .onTapGesture {
+                                        selectedSession = session
+                                    }
+                            }
+                        }
+                    }
+                }
+                .mapControls {
+                    MapUserLocationButton()
+                    MapCompass()
+                    MapScaleView()
+                }
+                .mapStyle(.standard)
+                .onAppear {
+                    print("📍 Map appeared - Sessions: \(statsVM.sessions.count)")
+                    statsVM.loadSessions()
+                    locationService.startUpdating()
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if let location = locationService.currentLocation {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                position = .region(MKCoordinateRegion(
+                                    center: location.coordinate,
+                                    span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                                ))
+                            }
+                            print("📍 Centered on user location")
+                        } else {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                position = .region(MKCoordinateRegion(
+                                    center: nibmLocation,
+                                    span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                                ))
+                            }
+                            print("📍 Centered on NIBM Sri Lanka")
+                        }
+                    }
+                }
+                .onDisappear {
+                    locationService.stopUpdating()
+                }
+                .onChange(of: locationService.currentLocation) { oldLocation, newLocation in
+                    if let location = newLocation, isTracking {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            position = .region(MKCoordinateRegion(
+                                center: location.coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                            ))
+                        }
+                        refreshID = UUID()
+                    }
+                }
+                .id(refreshID)
+                .navigationTitle("Game Locations")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Text("🗺️ MAP")
+                            .font(.system(.headline, design: .monospaced))
+                            .fontWeight(.black)
+                            .foregroundColor(.white)
+                            .shadow(color: .purple.opacity(0.5), radius: 5)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        HStack(spacing: 16) {
+                            // Tracking Toggle
+                            Button {
+                                isTracking.toggle()
+                                if isTracking, let location = locationService.currentLocation {
+                                    withAnimation(.easeInOut(duration: 0.5)) {
+                                        position = .region(MKCoordinateRegion(
+                                            center: location.coordinate,
+                                            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                                        ))
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: isTracking ? "location.fill" : "location.slash.fill")
+                                    .foregroundColor(isTracking ? .cyan : .gray)
+                            }
+                            
+                            // Recenter
+                            Button {
+                                if let location = locationService.currentLocation {
+                                    withAnimation(.easeInOut(duration: 0.5)) {
+                                        position = .region(MKCoordinateRegion(
+                                            center: location.coordinate,
+                                            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                                        ))
+                                    }
+                                    isTracking = true
+                                } else {
+                                    withAnimation(.easeInOut(duration: 0.5)) {
+                                        position = .region(MKCoordinateRegion(
+                                            center: nibmLocation,
+                                            span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                                        ))
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "location.circle.fill")
+                                    .foregroundColor(.cyan)
+                            }
+                            
+                            // Refresh
+                            Button {
+                                statsVM.loadSessions()
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                                    .foregroundColor(.cyan)
+                            }
+                        }
+                    }
+                }
+                .sheet(item: $selectedSession) { session in
+                    SessionDetailSheet(session: session)
+                }
+                .overlay {
+                    let sessionsWithLocation = statsVM.sessions.filter { $0.locationCoordinate != nil }
+                    
+                    if sessionsWithLocation.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "map")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                            Text("No Game Locations Yet")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            Text("Play a game to see pins on the map")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.4))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.black.opacity(0.8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
                         )
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            position = .region(MKCoordinateRegion(
-                                center: fixedCoord,
-                                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                            ))
-                        }
-                        print("📍 Centered on fixed user location")
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            position = .region(MKCoordinateRegion(
-                                center: nibmLocation,
-                                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                            ))
-                        }
-                        print("📍 Centered on NIBM Sri Lanka")
                     }
                 }
             }
-            .onDisappear {
-                locationService.stopUpdating()
-            }
-            .onChange(of: locationService.currentLocation) { oldLocation, newLocation in
-                if let location = newLocation, isTracking {
-                    let fixedCoord = CLLocationCoordinate2D(
-                        latitude: location.coordinate.latitude,
-                        longitude: abs(location.coordinate.longitude)
-                    )
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        position = .region(MKCoordinateRegion(
-                            center: fixedCoord,
-                            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                        ))
-                    }
-                    refreshID = UUID()
-                }
-            }
-            .id(refreshID)
-            .navigationTitle("Game Locations")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        // Tracking Toggle
-                        Button {
-                            isTracking.toggle()
-                            if isTracking, let location = locationService.currentLocation {
-                                let fixedCoord = CLLocationCoordinate2D(
-                                    latitude: location.coordinate.latitude,
-                                    longitude: abs(location.coordinate.longitude)
-                                )
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    position = .region(MKCoordinateRegion(
-                                        center: fixedCoord,
-                                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                                    ))
-                                }
-                            }
-                        } label: {
-                            Image(systemName: isTracking ? "location.fill" : "location.slash.fill")
-                                .foregroundColor(isTracking ? .purple : .gray)
-                        }
-                        
-                        // Recenter
-                        Button {
-                            if let location = locationService.currentLocation {
-                                let fixedCoord = CLLocationCoordinate2D(
-                                    latitude: location.coordinate.latitude,
-                                    longitude: abs(location.coordinate.longitude)
-                                )
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    position = .region(MKCoordinateRegion(
-                                        center: fixedCoord,
-                                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                                    ))
-                                }
-                                isTracking = true
-                            } else {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    position = .region(MKCoordinateRegion(
-                                        center: nibmLocation,
-                                        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                                    ))
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "location.circle.fill")
-                                .foregroundColor(.purple)
-                        }
-                        
-                        // Refresh
-                        Button {
-                            statsVM.loadSessions()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.purple)
-                        }
-                    }
-                }
-            }
-            .sheet(item: $selectedSession) { session in
-                SessionDetailSheet(session: session)
-            }
-            .overlay {
-                let sessionsWithLocation = statsVM.sessions.filter { $0.locationCoordinate != nil }
-                
-                if sessionsWithLocation.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "map")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray)
-                        Text("No Game Locations Yet")
-                            .font(.headline)
-                        Text("Play a game to see pins on the map")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                    }
-                    .padding()
-                    .background(Color(.systemBackground).opacity(0.9))
-                    .cornerRadius(16)
-                }
-            }
+            .background(LinearGradient.mainGradient)
         }
     }
 }
@@ -311,9 +295,9 @@ struct GameSessionPin: View {
     
     private func markerColor(for mode: GameMode) -> Color {
         switch mode {
-        case .tapFrenzy: return .blue
-        case .lightItUp: return .orange
-        case .quizRush: return .purple
+        case .tapFrenzy: return .tapFrenzyColor
+        case .lightItUp: return .lightItUpColor
+        case .quizRush: return .quizRushColor
         }
     }
     
@@ -364,89 +348,102 @@ struct SessionDetailSheet: View {
     
     private func markerColor(for mode: GameMode) -> Color {
         switch mode {
-        case .tapFrenzy: return .blue
-        case .lightItUp: return .orange
-        case .quizRush: return .purple
+        case .tapFrenzy: return .tapFrenzyColor
+        case .lightItUp: return .lightItUpColor
+        case .quizRush: return .quizRushColor
         }
     }
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                ZStack {
-                    Circle()
-                        .fill(markerColor(for: session.mode).opacity(0.2))
-                        .frame(width: 80, height: 80)
-                    
-                    Image(systemName: session.mode.iconName)
-                        .font(.system(size: 40))
-                        .foregroundColor(markerColor(for: session.mode))
-                }
-                .padding(.top, 20)
+            ZStack {
+                LinearGradient.mainGradient
+                    .ignoresSafeArea()
                 
-                VStack(spacing: 4) {
-                    Text("Score")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(session.score)")
-                        .font(.system(size: 52, weight: .bold))
-                        .foregroundColor(markerColor(for: session.mode))
-                }
-                
-                Divider()
-                    .padding(.horizontal, 40)
-                
-                VStack(spacing: 4) {
-                    Text("Game Mode")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(session.mode.rawValue)
-                        .font(.headline)
-                }
-                
-                VStack(spacing: 4) {
-                    Text("Date & Time")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(session.timestamp, format: .dateTime.day().month().year())
-                        .font(.subheadline)
-                    Text(session.timestamp, format: .dateTime.hour().minute())
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                if let coordinate = session.locationCoordinate {
-                    VStack(spacing: 4) {
-                        Text("Location")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("Lat: \(String(format: "%.6f", coordinate.latitude))")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                        Text("Lon: \(String(format: "%.6f", coordinate.longitude))")
-                            .font(.caption)
-                            .fontWeight(.medium)
+                VStack(spacing: 24) {
+                    ZStack {
+                        Circle()
+                            .fill(markerColor(for: session.mode).opacity(0.2))
+                            .frame(width: 80, height: 80)
+                        
+                        Image(systemName: session.mode.iconName)
+                            .font(.system(size: 40))
+                            .foregroundColor(markerColor(for: session.mode))
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 20)
+                    
+                    VStack(spacing: 4) {
+                        Text("Score")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("\(session.score)")
+                            .font(.system(size: 52, weight: .bold, design: .monospaced))
+                            .foregroundColor(.yellow)
+                            .shadow(color: .yellow.opacity(0.3), radius: 5)
+                    }
+                    
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.horizontal, 40)
+                    
+                    VStack(spacing: 4) {
+                        Text("Game Mode")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text(session.mode.rawValue)
+                            .font(.system(.headline, design: .monospaced))
+                            .foregroundColor(.white)
+                    }
+                    
+                    VStack(spacing: 4) {
+                        Text("Date & Time")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text(session.timestamp, format: .dateTime.day().month().year())
+                            .font(.system(.subheadline, design: .monospaced))
+                            .foregroundColor(.white)
+                        Text(session.timestamp, format: .dateTime.hour().minute())
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    
+                    if let coordinate = session.locationCoordinate {
+                        VStack(spacing: 4) {
+                            Text("Location")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text("Lat: \(String(format: "%.6f", coordinate.latitude))")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text("Lon: \(String(format: "%.6f", coordinate.longitude))")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        .padding(.top, 4)
+                    }
+                    
+                    Spacer()
                 }
-                
-                Spacer()
+                .padding()
             }
-            .padding()
             .navigationTitle("Session Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("📌 SESSION")
+                        .font(.system(.headline, design: .monospaced))
+                        .fontWeight(.black)
+                        .foregroundColor(.white)
+                        .shadow(color: .purple.opacity(0.5), radius: 5)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.cyan)
                 }
             }
         }
         .presentationDetents([.medium])
     }
-}
-
-#Preview {
-    MapTab()
-        .environmentObject(StatsViewModel())
-        .environmentObject(LocationService())
 }

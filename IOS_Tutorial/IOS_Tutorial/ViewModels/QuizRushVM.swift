@@ -49,7 +49,6 @@ class QuizRushVM: ObservableObject {
     }
     
     func loadQuestions(categoryID: Int? = nil) async {
-        print("🟣 loadQuestions called with categoryID: \(categoryID?.description ?? "nil")")
         selectedCategoryID = categoryID
         currentLevel = .easy
         correctStreak = 0
@@ -72,26 +71,21 @@ class QuizRushVM: ObservableObject {
         }
         
         do {
-            print("🟣 Fetching questions from API for category: \(categoryID?.description ?? "Random")")
             let fetched = try await api.fetchQuestions(categoryID: categoryID)
-            print("🟣 API returned \(fetched.count) questions")
-            
             let sortedQuestions = sortQuestionsByDifficulty(fetched)
             
             await MainActor.run {
                 if sortedQuestions.isEmpty {
                     state = .idle
                     showError = true
-                    errorMessage = "No questions available for this category. Please try another."
+                    errorMessage = "No questions available for this category."
                 } else {
                     questions = sortedQuestions
                     state = .loaded
                     print("✅ Loaded \(sortedQuestions.count) questions")
-                    print("✅ First question: \(sortedQuestions.first?.question.prefix(50) ?? "nil")")
                 }
             }
         } catch {
-            print("❌ API Error: \(error.localizedDescription)")
             await MainActor.run {
                 showError = true
                 errorMessage = "Failed to load questions: \(error.localizedDescription)"
@@ -116,19 +110,20 @@ class QuizRushVM: ObservableObject {
         
         if answer == question.correct_answer {
             answerState = .correct
-            let bonusPoints = 2
             streak += 1
             correctStreak += 1
-            score += bonusPoints + (streak >= 3 ? 1 : 0)
-            feedbackMessage = "✅ Correct! +\(bonusPoints) points \(streak >= 3 ? "🔥 Streak: \(streak)!" : "")"
+            let bonus = streak >= 3 ? 1 : 0
+            score += 2 + bonus
+            feedbackMessage = "✅ Correct! +2 points"
         } else {
             answerState = .wrong
-            score = max(0, score - 1)
             streak = 0
             correctStreak = 0
-            feedbackMessage = "❌ Wrong! Correct answer: \(question.correct_answer.decodedHTML)"
+            score = max(0, score - 1)
+            feedbackMessage = "❌ Wrong! -1 point"
         }
         
+        // ✅ Force show feedback
         showFeedback = true
         
         if correctStreak >= 3 {
@@ -141,6 +136,7 @@ class QuizRushVM: ObservableObject {
             guard let self = self else { return }
             
             Task { @MainActor in
+                // ✅ Reset for next question
                 self.showFeedback = false
                 self.feedbackMessage = ""
                 self.isAnswering = false
@@ -156,7 +152,7 @@ class QuizRushVM: ObservableObject {
             }
         }
         workItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5, execute: item)
     }
     
     private func checkLevelUp() {
@@ -174,12 +170,10 @@ class QuizRushVM: ObservableObject {
         }
         
         if newLevel != currentLevel {
-            let oldLevel = currentLevel
             currentLevel = newLevel
             showLevelUp = true
             levelUpMessage = "🎉 Level Up! You reached \(newLevel.difficultyString) level!"
             correctStreak = 0
-            print("⬆️ Level up: \(oldLevel.difficultyString) → \(newLevel.difficultyString)")
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 self.showLevelUp = false
@@ -230,14 +224,6 @@ enum QuizLevel: Int, CaseIterable {
         case .easy: return .green
         case .medium: return .orange
         case .hard: return .red
-        }
-    }
-    
-    var icon: String {
-        switch self {
-        case .easy: return "star.fill"
-        case .medium: return "star.leadinghalf.filled"
-        case .hard: return "star"
         }
     }
 }

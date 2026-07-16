@@ -15,26 +15,48 @@ struct SettingsSheet: View {
     
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Round Duration") {
-                    Picker("Duration", selection: $selectedDuration) {
-                        ForEach(options, id: \.self) { option in
-                            Text("\(option)s")
-                                .tag(option)
+            ZStack {
+                LinearGradient.mainGradient
+                    .ignoresSafeArea()
+                
+                Form {
+                    Section {
+                        Picker("Duration", selection: $selectedDuration) {
+                            ForEach(options, id: \.self) { option in
+                                Text("\(option)s")
+                                    .tag(option)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .tint(.orange)
+                    } header: {
+                        Text("ROUND DURATION")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.6))
                     }
-                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.white.opacity(0.05))
                 }
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("⚙️ SETTINGS")
+                        .font(.system(.headline, design: .monospaced))
+                        .fontWeight(.black)
+                        .foregroundColor(.white)
+                        .shadow(color: .purple.opacity(0.5), radius: 5)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundColor(.orange)
                 }
             }
+            .environment(\.colorScheme, .dark)
         }
         .presentationDetents([.medium])
     }

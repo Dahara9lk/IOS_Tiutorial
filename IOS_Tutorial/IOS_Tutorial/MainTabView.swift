@@ -8,52 +8,41 @@
 import SwiftUI
 
 struct MainTabView: View {
-    // vIEW Models
     @StateObject private var statsVM = StatsViewModel()
     @StateObject private var locationService = LocationService()
     
     var body: some View {
         TabView {
-                    // Tab 1: Home
-                    HomeTab()
-                        .tabItem {
-                            Label("Home", systemImage: "house.fill")
-                        }
-                    
-                    // Tab 2: Stats
-                    StatsTab()
-                        .tabItem {
-                            Label("Stats", systemImage: "chart.bar.fill")
-                        }
-                    
-                    // Tab 3: Map
-                    MapTab()
-                        .tabItem {
-                            Label("Map", systemImage: "map.fill")
-                        }
-                    
-                    // Tab 4: Settings
-                    SettingsTab()
-                        .tabItem {
-                            Label("Settings", systemImage: "gear")
-                        }
+            HomeTab()
+                .tabItem {
+                    Label("Home", systemImage: "gamecontroller.fill")
                 }
-                .tint(.blue)
-                .environmentObject(statsVM)
-                .environmentObject(locationService)
-                .onAppear {
-                    // Request permissions
-                    locationService.requestPermission()
-                    
-                    // Request notification permission
-                    let notificationService = NotificationService.shared
-                    notificationService.requestPermission()
+            
+            StatsTab()
+                .tabItem {
+                    Label("Stats", systemImage: "chart.bar.fill")
                 }
-            }
+            
+            MapTab()
+                .tabItem {
+                    Label("Map", systemImage: "map.fill")
+                }
+            
+            SettingsTab()
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
         }
+        .tint(.purple)
+        .environmentObject(statsVM)
+        .environmentObject(locationService)
+        .onAppear {
+            locationService.requestPermission()
+            print("📍 Sessions count: \(statsVM.sessions.count)")
+        }
+    }
+}
 
-        #Preview {
-            MainTabView()
-        }
-        
-    
+#Preview {
+    MainTabView()
+}
