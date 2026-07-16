@@ -21,7 +21,7 @@ struct SettingsTab: View {
             Form {
                 Section("Notifications") {
                     Toggle("Enable Notifications", isOn: $notificationsEnabled)
-                        .onChange(of: notificationsEnabled) { newValue in
+                        .onChange(of: notificationsEnabled) { _, newValue in
                             if newValue {
                                 notificationService.requestPermission()
                                 notificationService.scheduleDailyNotification(at: dailyTime)
@@ -31,7 +31,7 @@ struct SettingsTab: View {
                         }
                     
                     DatePicker("Daily Challenge Time", selection: $dailyTime, displayedComponents: .hourAndMinute)
-                        .onChange(of: dailyTime) { newTime in
+                        .onChange(of: dailyTime) { _, newTime in
                             dailyTimeData = newTime
                             if notificationsEnabled {
                                 notificationService.scheduleDailyNotification(at: newTime)

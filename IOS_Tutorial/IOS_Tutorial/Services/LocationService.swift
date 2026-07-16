@@ -13,6 +13,7 @@ final class LocationService: NSObject, ObservableObject {
     @Published var currentLocation: CLLocation?
     @Published var lastError: Error?
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
+    @Published private(set) var isUpdating = false
 
     private let locationManager = CLLocationManager()
 
@@ -43,8 +44,10 @@ final class LocationService: NSObject, ObservableObject {
             locationManager.requestWhenInUseAuthorization()
         case .authorizedAlways, .authorizedWhenInUse:
             locationManager.startUpdatingLocation()
+            isUpdating = true
         case .denied, .restricted:
             authorizationStatus = locationManager.authorizationStatus
+            isUpdating = false
         @unknown default:
             authorizationStatus = locationManager.authorizationStatus
         }
@@ -52,6 +55,7 @@ final class LocationService: NSObject, ObservableObject {
 
     func stopUpdating() {
         locationManager.stopUpdatingLocation()
+        isUpdating = false
     }
 }
 
@@ -61,6 +65,9 @@ extension LocationService: CLLocationManagerDelegate {
 
         if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse {
             manager.startUpdatingLocation()
+            isUpdating = true
+        } else {
+            isUpdating = false
         }
     }
 
@@ -70,6 +77,7 @@ extension LocationService: CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         lastError = error
+        isUpdating = false
     }
 }
 
