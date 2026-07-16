@@ -302,7 +302,7 @@ struct CategorySelectionView: View {
                     GridItem(.flexible())
                 ], spacing: 12) {
                     GameCategoryButton(
-                        title: "🎲 RANDOM",
+                        title: "🎲 Random",
                         subtitle: "Surprise me!",
                         isSelected: selectedCategory == nil,
                         color: .purple
@@ -314,7 +314,7 @@ struct CategorySelectionView: View {
                     
                     ForEach(categories) { category in
                         GameCategoryButton(
-                            title: category.name.uppercased(),
+                            title: category.name,
                             subtitle: "",
                             isSelected: selectedCategory == category.id,
                             color: categoryColor(for: category.id)
@@ -326,6 +326,9 @@ struct CategorySelectionView: View {
                     }
                 }
                 .padding()
+            }
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 100)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -346,8 +349,6 @@ struct GameCategoryButton: View {
     let color: Color
     let action: () -> Void
     
-    @State private var isHovered = false
-    
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 4) {
@@ -366,26 +367,31 @@ struct GameCategoryButton: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
+        }
+        .buttonStyle(CategoryButtonStyle(isSelected: isSelected, color: color))
+    }
+}
+
+struct CategoryButtonStyle: ButtonStyle {
+    let isSelected: Bool
+    let color: Color
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isSelected ? color.opacity(0.3) : (isHovered ? color.opacity(0.15) : Color.white.opacity(0.03)))
+                    .fill(isSelected ? color.opacity(0.3) : (configuration.isPressed ? color.opacity(0.15) : Color.white.opacity(0.03)))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isSelected ? color : (isHovered ? color.opacity(0.5) : Color.white.opacity(0.05)), lineWidth: isSelected ? 2 : 1)
+                            .stroke(isSelected ? color : (configuration.isPressed ? color.opacity(0.5) : Color.white.opacity(0.05)), lineWidth: isSelected ? 2 : 1)
                     )
             )
-            .scaleEffect(isHovered && !isSelected ? 1.03 : (isSelected ? 1.03 : 1.0))
+            .scaleEffect(configuration.isPressed ? 0.95 : (isSelected ? 1.03 : 1.0))
             .shadow(
-                color: isHovered || isSelected ? color.opacity(0.3) : .clear,
-                radius: isHovered || isSelected ? 10 : 0
+                color: configuration.isPressed || isSelected ? color.opacity(0.3) : .clear,
+                radius: configuration.isPressed || isSelected ? 10 : 0
             )
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
-        }
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
