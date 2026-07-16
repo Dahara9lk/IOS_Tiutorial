@@ -5,41 +5,17 @@
 //  Created by Student4 on 2026-06-30.
 //
 
-
 import SwiftUI
-
-// MARK: - Question Progress View
-struct QuestionProgressView: View {
-    let current: Int
-    let total: Int
-    let streak: Int
-    
-    var body: some View {
-        HStack {
-            Text("Question \(current + 1) of \(total)")
-                .font(.headline)
-            
-            Spacer()
-            
-            if streak > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .foregroundColor(.orange)
-                    Text("\(streak)")
-                        .fontWeight(.semibold)
-                }
-                .foregroundColor(.orange)
-            }
-        }
-    }
-}
 
 // MARK: - Answer Button
 struct AnswerButton: View {
     let text: String
     let isSelected: Bool
     let state: AnswerState
+    let isDisabled: Bool
     let action: () -> Void
+    
+    @State private var isHovered = false
     
     var body: some View {
         Button(action: action) {
@@ -56,10 +32,17 @@ struct AnswerButton: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(borderColor, lineWidth: 2)
                 )
-                .scaleEffect(isSelected ? 0.98 : 1.0)
+                .scaleEffect(isHovered && !isDisabled && state == .none ? 1.02 : 1.0)
+                .shadow(color: isHovered && !isDisabled && state == .none ? Color.purple.opacity(0.3) : .clear, radius: 8)
         }
-        .disabled(state != .none)
+        .disabled(isDisabled || state != .none)
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
         .animation(.easeInOut(duration: 0.2), value: state)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
     }
     
     private var backgroundColor: Color {
@@ -69,7 +52,10 @@ struct AnswerButton: View {
         case .wrong:
             return Color.red.opacity(0.2)
         default:
-            return isSelected ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1)
+            if isSelected {
+                return Color.purple.opacity(0.2)
+            }
+            return isHovered ? Color.purple.opacity(0.08) : Color.gray.opacity(0.1)
         }
     }
     
@@ -80,7 +66,7 @@ struct AnswerButton: View {
         case .wrong:
             return .red
         default:
-            return .primary
+            return isSelected ? .purple : .primary
         }
     }
     
@@ -91,134 +77,10 @@ struct AnswerButton: View {
         case .wrong:
             return .red
         default:
-            return isSelected ? .blue : Color.clear
-        }
-    }
-}
-
-// MARK: - Loading View
-struct QuizLoadingView: View {
-    var body: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-            Text("Loading Questions...")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            Text("Fetching from Open Trivia DB")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Error View
-struct QuizErrorView: View {
-    let error: Error
-    let onRetry: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
-            
-            Text("Oops! Something went wrong")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text(error.localizedDescription)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Button(action: onRetry) {
-                HStack {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Try Again")
-                }
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .cornerRadius(10)
+            if isSelected {
+                return .purple
             }
+            return isHovered ? Color.purple.opacity(0.5) : Color.clear
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-    }
-}
-
-// MARK: - Finished View
-struct QuizFinishedView: View {
-    let score: Int
-    let maxStreak: Int
-    let totalQuestions: Int
-    let onPlayAgain: () -> Void
-    let onHome: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 25) {
-            Image(systemName: "trophy.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.yellow)
-            
-            Text("Quiz Complete!")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            
-            VStack(spacing: 12) {
-                HStack {
-                    Text("Score:")
-                        .font(.headline)
-                    Text("\(score)")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                }
-                
-                HStack {
-                    Text("Best Streak:")
-                        .font(.headline)
-                    Text("\(maxStreak)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.orange)
-                }
-                
-                Text("\(score)/\(totalQuestions)")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-            }
-            
-            VStack(spacing: 12) {
-                Button(action: onPlayAgain) {
-                    Text("Play Again")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
-                }
-                
-                Button(action: onHome) {
-                    Text("Home")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(12)
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
 }

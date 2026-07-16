@@ -25,6 +25,15 @@ struct Question: Codable, Identifiable {
         answers.append(correct_answer)
         return answers.shuffled()
     }
+    
+    enum CodingKeys: String, CodingKey {
+        case category
+        case type
+        case difficulty
+        case question
+        case correct_answer
+        case incorrect_answers
+    }
 }
 
 enum QuizState {

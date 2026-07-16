@@ -5,11 +5,11 @@
 //  Created by Student4 on 2026-06-30.
 //
 
-
 import SwiftUI
 import Combine
 
-class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is remaing the same
+@MainActor  // ✅ Added - ensures all UI updates happen on main thread
+class QuizRushVM: ObservableObject {
     @Published var questions: [Question] = []
     @Published var currentIndex = 0
     @Published var score = 0
@@ -18,34 +18,23 @@ class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is r
     @Published var selectedAnswer: String?
     @Published var answerState: AnswerState = .none
     @Published var isAnswering = false
+    @Published var showFeedback = false  // ✅ Added - needed for UI feedback
+    @Published var feedbackMessage = ""  // ✅ Added - needed for UI feedback
     
     private let service = QuizService()
+    private var workItem: DispatchWorkItem?  // ✅ Added - to cancel delayed tasks
     
     var currentQuestion: Question? {
         guard currentIndex < questions.count else { return nil }
         return questions[currentIndex]
     }
     
-    var showFeedback: Bool {
-        answerState != .none
-    }
-    
-    var feedbackMessage: String {
-        switch answerState {
-        case .correct:
-            return "Correct! \(streak >= 2 ? "Streak: \(streak)!" : "")"
-        case .wrong:
-            if let question = currentQuestion {
-                return "Wrong! Correct answer: \(question.correct_answer.decodedHTML)"
-            }
-            return "Wrong!"
-        case .none:
-            return ""
-        }
-    }
+    // ✅ Fixed - use stored properties instead of computed
+    // Removed: var showFeedback { answerState != .none }
+    // Removed: var feedbackMessage { ... }
     
     @MainActor
-    func loadQuestions() async {
+    func loadQuestions(categoryID: Int? = nil) async {
         state = .loading
         questions = []
         currentIndex = 0
@@ -54,15 +43,16 @@ class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is r
         selectedAnswer = nil
         answerState = .none
         isAnswering = false
+        showFeedback = false
+        feedbackMessage = ""
         
         do {
-            let fetched = try await service.fetchQuestions()
+            let fetched = try await service.fetchQuestions(categoryID: categoryID)
             questions = fetched
             state = .loaded
             print("✅ Loaded \(fetched.count) questions")
         } catch {
             print("❌ Error: \(error)")
-            // Fallback questions if API fails
             questions = getFallbackQuestions()
             state = .loaded
         }
@@ -121,15 +111,26 @@ class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is r
         
         if answer == question.correct_answer {
             answerState = .correct
+            feedbackMessage = "✅ Correct! \(streak >= 2 ? "Streak: \(streak + 1)!" : "")"
             streak += 1
             let bonus = streak >= 3 ? 2 : (streak >= 2 ? 1 : 0)
             score += 1 + bonus
         } else {
             answerState = .wrong
+            feedbackMessage = "❌ Wrong! Correct answer: \(question.correct_answer.decodedHTML)"
             streak = 0
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+        showFeedback = true
+        
+        // ✅ Cancel any existing work item
+        workItem?.cancel()
+        
+        let item = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.showFeedback = false
+            self.feedbackMessage = ""
+            
             if self.currentIndex < self.questions.count - 1 {
                 self.currentIndex += 1
                 self.selectedAnswer = nil
@@ -139,9 +140,12 @@ class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is r
                 self.state = .finished
             }
         }
+        workItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: item)
     }
     
     func reset() {
+        workItem?.cancel()
         questions = []
         currentIndex = 0
         score = 0
@@ -150,5 +154,7 @@ class QuizRushVM: ObservableObject { //this was QuizView.swift but the code is r
         selectedAnswer = nil
         answerState = .none
         isAnswering = false
+        showFeedback = false
+        feedbackMessage = ""
     }
 }

@@ -30,11 +30,6 @@ struct TapFrenzyView: View {
             VStack {
                 // Header
                 HStack {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "arrow.left")
-                            .font(.title2)
-                    }
-                    
                     Spacer()
                     
                     Text("Tap Frenzy")
@@ -76,9 +71,15 @@ struct TapFrenzyView: View {
                     Spacer()
                     
                     // Tap Button
-                    Button(action: handleTap) {
+                    Button(action: {
+                        if isGameActive {
+                            handleTap()
+                        } else {
+                            startGame()
+                        }
+                    }) {
                         Circle()
-                            .fill(isGameActive ? Color.blue : Color.gray)
+                            .fill(isGameActive ? Color.blue : Color.green)
                             .frame(width: 200, height: 200)
                             .overlay(
                                 Text(isGameActive ? "TAP" : "START")
@@ -89,24 +90,8 @@ struct TapFrenzyView: View {
                             .scaleEffect(isGameActive ? 1.0 : 0.9)
                             .animation(.easeInOut(duration: 0.2), value: isGameActive)
                     }
-                    .disabled(!isGameActive)
                     
                     Spacer()
-                    
-                    // Start Button (if not active)
-                    if !isGameActive && !showGameOver {
-                        Button(action: startGame) {
-                            Text("Start Game")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.green)
-                                .cornerRadius(15)
-                        }
-                        .padding(.horizontal)
-                    }
                 }
                 .padding()
             }

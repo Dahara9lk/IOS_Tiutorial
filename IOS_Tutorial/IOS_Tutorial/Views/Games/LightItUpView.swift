@@ -36,11 +36,6 @@ struct LightItUpView: View {
         VStack {
             // Header
             HStack {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "arrow.left")
-                        .font(.title2)
-                }
-                
                 Spacer()
                 
                 Text("Light It Up")
@@ -55,77 +50,97 @@ struct LightItUpView: View {
             }
             .padding()
             
-            // Stats
-            HStack {
-                VStack {
-                    Text("Score")
-                        .font(.caption)
-                    Text("\(score)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                }
-                
-                Spacer()
-                
-                VStack {
-                    Text("Lives")
-                        .font(.caption)
-                    HStack {
-                        ForEach(0..<3, id: \.self) { index in
-                            Image(systemName: index < lives ? "heart.fill" : "heart")
-                                .foregroundColor(.red)
+            if isGameActive {
+                // Stats
+                HStack {
+                    VStack {
+                        Text("Score")
+                            .font(.caption)
+                        Text("\(score)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text("Lives")
+                            .font(.caption)
+                        HStack {
+                            ForEach(0..<3, id: \.self) { index in
+                                Image(systemName: index < lives ? "heart.fill" : "heart")
+                                    .foregroundColor(.red)
+                            }
                         }
                     }
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text("Time")
+                            .font(.caption)
+                        Text("\(timeRemaining)s")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(timeRemaining <= 10 ? .red : .primary)
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Level Indicator
+                Text("Level \(currentLevel.rawValue)")
+                    .font(.headline)
+                    .foregroundColor(currentLevel.glowColor)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 15)
+                    .background(currentLevel.glowColor.opacity(0.2))
+                    .cornerRadius(10)
+                
+                // Grid - ✅ Using LightItUpCardView from CardView.swift
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: currentLevel.columns), spacing: 8) {
+                    ForEach(cards) { card in
+                        GameCardView(card: card, level: currentLevel)  // ✅ Updated name
+                            .onTapGesture {
+                                handleTap(card: card)
+                            }
+                    }
+                }
+                .padding()
+                .frame(maxHeight: .infinity)
+            } else if !showGameOver {
+                Spacer()
+                
+                VStack(spacing: 20) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(.yellow)
+                        .shadow(color: .yellow, radius: 10)
+                    
+                    Text("Ready to Light It Up?")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Tap cards when they light up. Don't let your lives run out!")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    
+                    Button(action: startGame) {
+                        Text("Start Game")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(width: 200)
+                            .padding()
+                            .background(Color.green)
+                            .cornerRadius(15)
+                    }
+                    .padding(.top, 10)
                 }
                 
                 Spacer()
-                
-                VStack {
-                    Text("Time")
-                        .font(.caption)
-                    Text("\(timeRemaining)s")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(timeRemaining <= 10 ? .red : .primary)
-                }
-            }
-            .padding(.horizontal)
-            
-            // Level Indicator
-            Text("Level \(currentLevel.rawValue)")
-                .font(.headline)
-                .foregroundColor(currentLevel.glowColor)
-                .padding(.vertical, 5)
-                .padding(.horizontal, 15)
-                .background(currentLevel.glowColor.opacity(0.2))
-                .cornerRadius(10)
-            
-            // Grid - ✅ Using LightItUpCardView from CardView.swift
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: currentLevel.columns), spacing: 8) {
-                ForEach(cards) { card in
-                    GameCardView(card: card, level: currentLevel)  // ✅ Updated name
-                        .onTapGesture {
-                            handleTap(card: card)
-                        }
-                }
-            }
-            .padding()
-            .frame(maxHeight: .infinity)
-            
-            // Start Button
-            if !isGameActive && !showGameOver {
-                Button(action: startGame) {
-                    Text("Start Game")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .cornerRadius(15)
-                }
-                .padding()
             }
         }
         .sheet(isPresented: $showSettings) {

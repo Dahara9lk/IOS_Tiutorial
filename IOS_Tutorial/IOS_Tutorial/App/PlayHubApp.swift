@@ -15,3 +15,4 @@ struct PlayHubApp: App {
         }
     }
 }
+
