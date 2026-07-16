@@ -14,12 +14,12 @@ struct TriviaCategory: Identifiable {
     let name: String
 }
 
-// MARK: - QuizRushView (ONLY the View - NO ViewModel Declaration)
+// MARK: - QuizRushView
 struct QuizRushView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var statsVM: StatsViewModel
     @EnvironmentObject var locationService: LocationService
-    @StateObject private var viewModel = QuizRushVM()  // ✅ Uses QuizRushVM from separate file
+    @StateObject private var viewModel = QuizRushVM()
     @State private var hasRecordedSession = false
     @State private var showCategorySelection = true
     @State private var selectedCategoryName = "Random"
@@ -107,12 +107,13 @@ struct QuizRushView: View {
                 .padding(.vertical, 6)
             }
             
-            // Content
+            // ✅ CONTENT - This is where the magic happens
             Group {
                 if showCategorySelection && viewModel.state != .finished {
                     CategorySelectionView(
                         categories: categories,
                         onCategorySelected: { categoryID, categoryName in
+                            print("🟣 Category selected: \(categoryName ?? "Random") (ID: \(categoryID?.description ?? "nil"))")
                             selectedCategoryName = categoryName ?? "Random"
                             showCategorySelection = false
                             Task {
@@ -144,12 +145,14 @@ struct QuizRushView: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(.purple)
                             }
-                        } else if let question = viewModel.currentQuestion {
+                            .padding()
+                        } else {
+                            // ✅ Display the question - using a simple view to avoid cycles
                             QuizQuestionView(
-                                question: question,
+                                question: viewModel.currentQuestion!,
                                 viewModel: viewModel
                             )
-                            .id(question.id)
+                            .id(viewModel.currentIndex) // ✅ Only refresh when index changes
                         }
                     case .finished:
                         QuizFinishedView(
@@ -169,8 +172,9 @@ struct QuizRushView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationBarBackButtonHidden(false)
-        .onChange(of: viewModel.state) { _, state in
-            if state == .finished {
+        .onChange(of: viewModel.state) { oldState, newState in
+            print("🟣 State changed from: \(oldState) to: \(newState)")
+            if newState == .finished {
                 recordSessionIfNeeded()
             }
         }
@@ -211,6 +215,288 @@ struct QuizRushView: View {
     }
 }
 
+// MARK: - Quiz Question View (Simplified to prevent cycles)
+struct QuizQuestionView: View {
+    let question: Question
+    @ObservedObject var viewModel: QuizRushVM
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Progress
+            HStack {
+                Text("Question \(viewModel.currentIndex + 1) of \(viewModel.totalQuestions)")
+                    .font(.headline)
+                Spacer()
+                if viewModel.streak > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .foregroundColor(.orange)
+                        Text("\(viewModel.streak)")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.orange)
+                }
+            }
+            .padding(.horizontal)
+            
+            // Question Card
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(question.category.decodedHTML)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.1))
+                        .cornerRadius(8)
+                    
+                    Text(question.difficulty.capitalized)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(difficultyColor.opacity(0.2))
+                        .cornerRadius(8)
+                        .foregroundColor(difficultyColor)
+                }
+                
+                Text(question.question.decodedHTML)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 8)
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+            .padding(.horizontal)
+            
+            // ✅ Answer Buttons
+            VStack(spacing: 12) {
+                ForEach(question.allAnswers, id: \.self) { answer in
+                    QuizAnswerButton(
+                        text: answer.decodedHTML,
+                        isSelected: viewModel.selectedAnswer == answer,
+                        state: getAnswerState(for: answer),
+                        isDisabled: viewModel.isAnswering || viewModel.showFeedback
+                    ) {
+                        if !viewModel.isAnswering && !viewModel.showFeedback {
+                            viewModel.selectAnswer(answer)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            
+            // ✅ Feedback
+            if viewModel.showFeedback {
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: viewModel.answerState == .correct ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
+                        
+                        Text(viewModel.feedbackMessage)
+                            .font(.headline)
+                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        viewModel.answerState == .correct ?
+                            Color.green.opacity(0.1) :
+                            Color.red.opacity(0.1)
+                    )
+                    .cornerRadius(12)
+                    
+                    if viewModel.answerState == .wrong {
+                        Text("Correct Answer: \(question.correct_answer.decodedHTML)")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Level Progress
+            VStack(spacing: 4) {
+                HStack {
+                    Text("Level Progress")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(viewModel.currentIndex + 1)/\(viewModel.totalQuestions)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(height: 4)
+                            .cornerRadius(2)
+                        
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: levelGradientColors,
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * viewModel.levelProgress, height: 4)
+                            .cornerRadius(2)
+                            .animation(.easeInOut(duration: 0.3), value: viewModel.levelProgress)
+                    }
+                }
+                .frame(height: 4)
+            }
+            .padding(.horizontal)
+            
+            Spacer(minLength: 20)
+        }
+        .padding(.vertical)
+        .onAppear {
+            print("✅ QuizQuestionView appeared with question: \(question.question.prefix(50))")
+        }
+    }
+    
+    private var difficultyColor: Color {
+        switch question.difficulty {
+        case "easy": return .green
+        case "medium": return .orange
+        default: return .red
+        }
+    }
+    
+    private var levelGradientColors: [Color] {
+        switch viewModel.currentLevel {
+        case .easy:
+            return [.green, .green.opacity(0.5)]
+        case .medium:
+            return [.orange, .orange.opacity(0.5)]
+        case .hard:
+            return [.red, .red.opacity(0.5)]
+        }
+    }
+    
+    private func getAnswerState(for answer: String) -> AnswerState {
+        if viewModel.isAnswering || viewModel.showFeedback {
+            if answer == question.correct_answer {
+                return .correct
+            }
+            if viewModel.selectedAnswer == answer && viewModel.answerState == .wrong {
+                return .wrong
+            }
+        }
+        
+        if viewModel.selectedAnswer == answer && !viewModel.showFeedback {
+            return viewModel.answerState
+        }
+        return .none
+    }
+}
+
+// MARK: - Quiz Answer Button
+struct QuizAnswerButton: View {
+    let text: String
+    let isSelected: Bool
+    let state: AnswerState
+    let isDisabled: Bool
+    let action: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(text)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .multilineTextAlignment(.center)
+                
+                Spacer()
+                
+                if state == .correct {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.title3)
+                } else if state == .wrong {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.title3)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(backgroundColor)
+            .foregroundColor(foregroundColor)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(borderColor, lineWidth: 2)
+            )
+            .scaleEffect(isHovered && !isDisabled && state == .none ? 1.03 : 1.0)
+            .shadow(
+                color: isHovered && !isDisabled && state == .none ? Color.purple.opacity(0.3) : .clear,
+                radius: isHovered && !isDisabled && state == .none ? 10 : 0
+            )
+        }
+        .disabled(isDisabled || state != .none)
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
+        .animation(.easeInOut(duration: 0.2), value: state)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+    
+    private var backgroundColor: Color {
+        switch state {
+        case .correct:
+            return Color.green.opacity(0.2)
+        case .wrong:
+            return Color.red.opacity(0.2)
+        default:
+            if isSelected {
+                return Color.purple.opacity(0.2)
+            }
+            return isHovered ? Color.purple.opacity(0.1) : Color.gray.opacity(0.08)
+        }
+    }
+    
+    private var foregroundColor: Color {
+        switch state {
+        case .correct:
+            return .green
+        case .wrong:
+            return .red
+        default:
+            return isSelected ? .purple : .primary
+        }
+    }
+    
+    private var borderColor: Color {
+        switch state {
+        case .correct:
+            return .green
+        case .wrong:
+            return .red
+        default:
+            if isSelected {
+                return .purple
+            }
+            return isHovered ? Color.purple.opacity(0.4) : Color.clear
+        }
+    }
+}
+
 // MARK: - Category Selection View
 struct CategorySelectionView: View {
     let categories: [TriviaCategory]
@@ -221,7 +507,6 @@ struct CategorySelectionView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Header
             VStack(spacing: 8) {
                 Image(systemName: "questionmark.circle.fill")
                     .font(.system(size: 50))
@@ -240,13 +525,11 @@ struct CategorySelectionView: View {
             Divider()
                 .padding(.horizontal)
             
-            // Category Grid
             ScrollView {
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 12) {
-                    // Random Category Button
                     CategoryButton(
                         title: "🎲 Random",
                         subtitle: "Surprise me!",
@@ -258,7 +541,6 @@ struct CategorySelectionView: View {
                         onCategorySelected(nil, "Random")
                     }
                     
-                    // Predefined Categories
                     ForEach(categories) { category in
                         CategoryButton(
                             title: category.name,
@@ -328,240 +610,6 @@ struct CategoryButton: View {
                 isHovered = hovering
             }
         }
-    }
-}
-
-// MARK: - Quiz Question View
-struct QuizQuestionView: View {
-    let question: Question
-    @ObservedObject var viewModel: QuizRushVM
-    
-    @State private var isQuestionVisible = false
-    @State private var isOptionsVisible = false
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            // Progress
-            HStack {
-                Text("Question \(viewModel.currentIndex + 1) of \(viewModel.totalQuestions)")
-                    .font(.headline)
-                Spacer()
-                if viewModel.streak > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .foregroundColor(.orange)
-                        Text("\(viewModel.streak)")
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.orange)
-                }
-            }
-            .padding(.horizontal)
-            
-            // Level Badge
-            HStack {
-                Spacer()
-                HStack(spacing: 4) {
-                    Image(systemName: viewModel.currentLevel.icon)
-                        .foregroundColor(viewModel.currentLevel.color)
-                        .font(.caption)
-                    Text(viewModel.currentLevel.difficultyString)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(viewModel.currentLevel.color)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(viewModel.currentLevel.color.opacity(0.15))
-                .cornerRadius(8)
-            }
-            .padding(.horizontal)
-            
-            // Question Card
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(question.category.decodedHTML)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.purple.opacity(0.1))
-                        .cornerRadius(8)
-                    
-                    Text(question.difficulty.capitalized)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(difficultyColor.opacity(0.2))
-                        .cornerRadius(8)
-                        .foregroundColor(difficultyColor)
-                }
-                
-                Text(question.question.decodedHTML)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .multilineTextAlignment(.center)
-                    .padding(.vertical, 8)
-                    .opacity(isQuestionVisible ? 1 : 0)
-                    .offset(y: isQuestionVisible ? 0 : 20)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-            .padding(.horizontal)
-            
-            // Answers
-            VStack(spacing: 12) {
-                ForEach(question.allAnswers, id: \.self) { answer in
-                    AnswerButton(
-                        text: answer.decodedHTML,
-                        isSelected: viewModel.selectedAnswer == answer,
-                        state: getAnswerState(for: answer),
-                        isDisabled: viewModel.isAnswering || viewModel.showFeedback
-                    ) {
-                        if !viewModel.isAnswering && !viewModel.showFeedback {
-                            viewModel.selectAnswer(answer)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .opacity(isOptionsVisible ? 1 : 0)
-            .offset(x: isOptionsVisible ? 0 : -20)
-            
-            // Feedback
-            if viewModel.showFeedback {
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: viewModel.answerState == .correct ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
-                        
-                        Text(viewModel.feedbackMessage)
-                            .font(.headline)
-                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        viewModel.answerState == .correct ?
-                            Color.green.opacity(0.1) :
-                            Color.red.opacity(0.1)
-                    )
-                    .cornerRadius(12)
-                    
-                    if viewModel.answerState == .wrong {
-                        Text("Correct Answer: \(question.correct_answer.decodedHTML)")
-                            .font(.subheadline)
-                            .foregroundColor(.green)
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(8)
-                    }
-                }
-                .padding(.horizontal)
-                .transition(.opacity)
-            }
-            
-            // Level Progress Bar
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Level Progress")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(viewModel.currentIndex + 1)/\(viewModel.totalQuestions)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 4)
-                            .cornerRadius(2)
-                        
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: levelGradientColors,
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width * viewModel.levelProgress, height: 4)
-                            .cornerRadius(2)
-                            .animation(.easeInOut(duration: 0.3), value: viewModel.levelProgress)
-                    }
-                }
-                .frame(height: 4)
-            }
-            .padding(.horizontal)
-            
-            Spacer()
-        }
-        .padding(.vertical)
-        .onAppear {
-            animateContent()
-        }
-        .onChange(of: viewModel.currentIndex) { _, _ in
-            animateContent()
-        }
-    }
-    
-    private func animateContent() {
-        isQuestionVisible = false
-        isOptionsVisible = false
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.easeOut(duration: 0.5)) {
-                isQuestionVisible = true
-            }
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            withAnimation(.easeOut(duration: 0.5)) {
-                isOptionsVisible = true
-            }
-        }
-    }
-    
-    private var difficultyColor: Color {
-        switch question.difficulty {
-        case "easy": return .green
-        case "medium": return .orange
-        default: return .red
-        }
-    }
-    
-    private var levelGradientColors: [Color] {
-        switch viewModel.currentLevel {
-        case .easy:
-            return [.green, .green.opacity(0.5)]
-        case .medium:
-            return [.orange, .orange.opacity(0.5)]
-        case .hard:
-            return [.red, .red.opacity(0.5)]
-        }
-    }
-    
-    private func getAnswerState(for answer: String) -> AnswerState {
-        if viewModel.isAnswering || viewModel.showFeedback {
-            if answer == question.correct_answer {
-                return .correct
-            }
-            if viewModel.selectedAnswer == answer && viewModel.answerState == .wrong {
-                return .wrong
-            }
-        }
-        
-        if viewModel.selectedAnswer == answer && !viewModel.showFeedback {
-            return viewModel.answerState
-        }
-        return .none
     }
 }
 

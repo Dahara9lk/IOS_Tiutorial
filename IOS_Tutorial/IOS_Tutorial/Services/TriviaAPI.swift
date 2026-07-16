@@ -53,7 +53,6 @@ class TriviaAPI {
         
         let (data, _) = try await URLSession.shared.data(from: url)
         
-        // Print raw response for debugging
         if let jsonString = String(data: data, encoding: .utf8) {
             print("📦 Raw API Response: \(jsonString.prefix(500))...")
         }
@@ -64,7 +63,6 @@ class TriviaAPI {
         print("✅ Got \(response.results.count) questions from API")
         print("📊 Response code: \(response.response_code)")
         
-        // Check if API returned an error
         if response.response_code != 0 {
             throw TriviaAPIError.apiError("Response code: \(response.response_code)")
         }

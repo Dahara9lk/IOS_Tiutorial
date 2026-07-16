@@ -2,7 +2,7 @@
 //  QuizViewModel.swift
 //  IOS_Tutorial
 //
-//  Created by Student4 on 2026-06-30.
+//  Created by Student4 on 2026-07-10.
 //
 
 import SwiftUI
@@ -28,6 +28,7 @@ class QuizRushVM: ObservableObject {
     
     // Level Progression
     @Published var currentLevel: QuizLevel = .easy
+    @Published var correctStreak = 0
     
     private let api = TriviaAPI()
     private var workItem: DispatchWorkItem?
@@ -48,8 +49,10 @@ class QuizRushVM: ObservableObject {
     }
     
     func loadQuestions(categoryID: Int? = nil) async {
+        print("🟣 loadQuestions called with categoryID: \(categoryID?.description ?? "nil")")
         selectedCategoryID = categoryID
         currentLevel = .easy
+        correctStreak = 0
         
         await MainActor.run {
             state = .loading
@@ -63,6 +66,7 @@ class QuizRushVM: ObservableObject {
             showFeedback = false
             feedbackMessage = ""
             showLevelUp = false
+            levelUpMessage = ""
             showError = false
             errorMessage = ""
         }
@@ -72,7 +76,6 @@ class QuizRushVM: ObservableObject {
             let fetched = try await api.fetchQuestions(categoryID: categoryID)
             print("🟣 API returned \(fetched.count) questions")
             
-            // Sort questions by difficulty for level progression
             let sortedQuestions = sortQuestionsByDifficulty(fetched)
             
             await MainActor.run {
@@ -80,29 +83,23 @@ class QuizRushVM: ObservableObject {
                     state = .idle
                     showError = true
                     errorMessage = "No questions available for this category. Please try another."
-                    print("❌ No questions returned from API")
                 } else {
                     questions = sortedQuestions
                     state = .loaded
-                    print("✅ Loaded \(sortedQuestions.count) questions from API sorted by difficulty")
-                    
-                    // Print question difficulties for debugging
-                    for (index, q) in sortedQuestions.enumerated() {
-                        print("   Question \(index + 1): \(q.difficulty) - \(q.category)")
-                    }
+                    print("✅ Loaded \(sortedQuestions.count) questions")
+                    print("✅ First question: \(sortedQuestions.first?.question.prefix(50) ?? "nil")")
                 }
             }
         } catch {
             print("❌ API Error: \(error.localizedDescription)")
             await MainActor.run {
                 showError = true
-                errorMessage = "Failed to load questions: \(error.localizedDescription)\nPlease check your internet connection and try again."
+                errorMessage = "Failed to load questions: \(error.localizedDescription)"
                 state = .idle
             }
         }
     }
     
-    // Sort questions by difficulty for level progression
     private func sortQuestionsByDifficulty(_ questions: [Question]) -> [Question] {
         let difficultyOrder: [String: Int] = ["easy": 0, "medium": 1, "hard": 2]
         return questions.sorted {
@@ -117,21 +114,26 @@ class QuizRushVM: ObservableObject {
         isAnswering = true
         selectedAnswer = answer
         
-        let levelPoints = currentLevel == .hard ? 3 : currentLevel == .medium ? 2 : 1
-        
         if answer == question.correct_answer {
             answerState = .correct
-            feedbackMessage = "✅ Correct! +\(levelPoints) points"
+            let bonusPoints = 2
             streak += 1
-            let bonus = streak >= 3 ? 2 : (streak >= 2 ? 1 : 0)
-            score += levelPoints + bonus
+            correctStreak += 1
+            score += bonusPoints + (streak >= 3 ? 1 : 0)
+            feedbackMessage = "✅ Correct! +\(bonusPoints) points \(streak >= 3 ? "🔥 Streak: \(streak)!" : "")"
         } else {
             answerState = .wrong
-            feedbackMessage = "❌ Wrong!"
+            score = max(0, score - 1)
             streak = 0
+            correctStreak = 0
+            feedbackMessage = "❌ Wrong! Correct answer: \(question.correct_answer.decodedHTML)"
         }
         
         showFeedback = true
+        
+        if correctStreak >= 3 {
+            checkLevelUp()
+        }
         
         workItem?.cancel()
         
@@ -148,14 +150,13 @@ class QuizRushVM: ObservableObject {
                     self.currentIndex += 1
                     self.selectedAnswer = nil
                     self.answerState = .none
-                    self.checkLevelUp()
                 } else {
                     self.state = .finished
                 }
             }
         }
         workItem = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: item)
     }
     
     private func checkLevelUp() {
@@ -176,8 +177,13 @@ class QuizRushVM: ObservableObject {
             let oldLevel = currentLevel
             currentLevel = newLevel
             showLevelUp = true
-            levelUpMessage = "You reached \(newLevel.difficultyString) level! 🎉\nQuestions will now be harder!"
+            levelUpMessage = "🎉 Level Up! You reached \(newLevel.difficultyString) level!"
+            correctStreak = 0
             print("⬆️ Level up: \(oldLevel.difficultyString) → \(newLevel.difficultyString)")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                self.showLevelUp = false
+            }
         }
     }
     
@@ -201,6 +207,7 @@ class QuizRushVM: ObservableObject {
         showError = false
         errorMessage = ""
         selectedCategoryID = nil
+        correctStreak = 0
     }
 }
 
