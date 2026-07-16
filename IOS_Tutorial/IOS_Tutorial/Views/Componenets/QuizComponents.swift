@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-// MARK: - Answer Button
+// MARK: - Answer Button with Hover Effect
 struct AnswerButton: View {
     let text: String
     let isSelected: Bool
@@ -19,21 +19,38 @@ struct AnswerButton: View {
     
     var body: some View {
         Button(action: action) {
-            Text(text)
-                .font(.body)
-                .fontWeight(.medium)
-                .multilineTextAlignment(.center)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(backgroundColor)
-                .foregroundColor(foregroundColor)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(borderColor, lineWidth: 2)
-                )
-                .scaleEffect(isHovered && !isDisabled && state == .none ? 1.02 : 1.0)
-                .shadow(color: isHovered && !isDisabled && state == .none ? Color.purple.opacity(0.3) : .clear, radius: 8)
+            HStack {
+                Text(text)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .multilineTextAlignment(.center)
+                
+                Spacer()
+                
+                if state == .correct {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.title3)
+                } else if state == .wrong {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.title3)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(backgroundColor)
+            .foregroundColor(foregroundColor)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(borderColor, lineWidth: 2)
+            )
+            .scaleEffect(isHovered && !isDisabled && state == .none ? 1.03 : 1.0)
+            .shadow(
+                color: isHovered && !isDisabled && state == .none ? Color.purple.opacity(0.3) : .clear,
+                radius: isHovered && !isDisabled && state == .none ? 10 : 0
+            )
         }
         .disabled(isDisabled || state != .none)
         .animation(.easeInOut(duration: 0.2), value: isHovered)
@@ -55,7 +72,7 @@ struct AnswerButton: View {
             if isSelected {
                 return Color.purple.opacity(0.2)
             }
-            return isHovered ? Color.purple.opacity(0.08) : Color.gray.opacity(0.1)
+            return isHovered ? Color.purple.opacity(0.1) : Color.gray.opacity(0.08)
         }
     }
     
@@ -80,7 +97,7 @@ struct AnswerButton: View {
             if isSelected {
                 return .purple
             }
-            return isHovered ? Color.purple.opacity(0.5) : Color.clear
+            return isHovered ? Color.purple.opacity(0.4) : Color.clear
         }
     }
 }

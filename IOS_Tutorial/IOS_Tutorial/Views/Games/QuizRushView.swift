@@ -1,117 +1,203 @@
 //
-//  QuizComponents.swift
+//  QuizRushView.swift
 //  IOS_Tutorial
 //
-//  Created by Student4 on 2026-06-30.
+//  Created by Student4 on 2026-07-10.
 //
-
 
 import SwiftUI
 import CoreLocation
 
+// MARK: - Trivia Category Model
+struct TriviaCategory: Identifiable {
+    let id: Int
+    let name: String
+}
+
+// MARK: - QuizRushView
 struct QuizRushView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var statsVM: StatsViewModel
     @EnvironmentObject var locationService: LocationService
     @StateObject private var viewModel = QuizRushVM()
     @State private var hasRecordedSession = false
+    @State private var showCategorySelection = true
+    @State private var selectedCategoryName = "Random"
+    
+    let categories: [TriviaCategory] = [
+        TriviaCategory(id: 9, name: "General Knowledge"),
+        TriviaCategory(id: 10, name: "Books"),
+        TriviaCategory(id: 11, name: "Film"),
+        TriviaCategory(id: 12, name: "Music"),
+        TriviaCategory(id: 13, name: "Musicals & Theatre"),
+        TriviaCategory(id: 14, name: "Television"),
+        TriviaCategory(id: 15, name: "Video Games"),
+        TriviaCategory(id: 16, name: "Board Games"),
+        TriviaCategory(id: 17, name: "Science & Nature"),
+        TriviaCategory(id: 18, name: "Computers"),
+        TriviaCategory(id: 19, name: "Mathematics"),
+        TriviaCategory(id: 20, name: "Mythology"),
+        TriviaCategory(id: 21, name: "Sports"),
+        TriviaCategory(id: 22, name: "Geography"),
+        TriviaCategory(id: 23, name: "History"),
+        TriviaCategory(id: 24, name: "Politics"),
+        TriviaCategory(id: 25, name: "Art"),
+        TriviaCategory(id: 26, name: "Celebrities"),
+        TriviaCategory(id: 27, name: "Animals"),
+        TriviaCategory(id: 28, name: "Vehicles"),
+        TriviaCategory(id: 29, name: "Comics"),
+        TriviaCategory(id: 30, name: "Gadgets"),
+        TriviaCategory(id: 31, name: "Anime & Manga"),
+        TriviaCategory(id: 32, name: "Cartoons"),
+    ]
     
     var body: some View {
-        VStack(spacing: 20) {
-            switch viewModel.state {
-            case .idle, .loading:
-                QuizLoadingView()
-            case .loaded:
-                quizContent
-            case .finished:
-                QuizFinishedView(
-                    score: viewModel.score,
-                    maxStreak: viewModel.streak,
-                    totalQuestions: viewModel.questions.count,
-                    onPlayAgain: { Task { await startQuiz() } },
-                    onHome: { dismiss() }
-                )
-            }
-        }
-        .navigationTitle("Quiz Rush")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            if viewModel.state == .idle {
-                await startQuiz()
-            }
-        }
-        .onChange(of: viewModel.state) { _, state in
-            if state == .finished {
-                recordSessionIfNeeded()
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var quizContent: some View {
-        if let question = viewModel.currentQuestion {
-            VStack(spacing: 24) {
-                QuestionProgressView(
-                    current: viewModel.currentIndex,
-                    total: viewModel.questions.count,
-                    streak: viewModel.streak
-                )
-                .padding(.horizontal)
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Spacer()
                 
-                VStack(spacing: 12) {
-                    Text(question.category.decodedHTML)
+                Text("Quiz Rush")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                    Text("\(viewModel.score)")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.purple)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.purple.opacity(0.1)))
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            
+            Divider()
+            
+            // Level & Category Info
+            if viewModel.state == .loaded && !showCategorySelection {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bolt.fill")
+                            .foregroundColor(viewModel.currentLevel.color)
+                            .font(.caption)
+                        Text("Level \(viewModel.currentLevel.rawValue)")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(viewModel.currentLevel.color)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(viewModel.currentLevel.color.opacity(0.15))
+                    .cornerRadius(8)
+                    
+                    Spacer()
+                    
+                    Text("Category: \(selectedCategoryName)")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
-                    Text(question.question.decodedHTML)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal)
-                
-                VStack(spacing: 12) {
-                    ForEach(question.allAnswers, id: \.self) { answer in
-                        AnswerButton(
-                            text: answer.decodedHTML,
-                            isSelected: viewModel.selectedAnswer == answer,
-                            state: answerState(for: answer, question: question),
-                            isDisabled: viewModel.isAnswering,
-                            action: { viewModel.selectAnswer(answer) }
+                .padding(.vertical, 6)
+            }
+            
+            // ✅ CONTENT - This is where the magic happens
+            Group {
+                if showCategorySelection && viewModel.state != .finished {
+                    CategorySelectionView(
+                        categories: categories,
+                        onCategorySelected: { categoryID, categoryName in
+                            print("🟣 Category selected: \(categoryName ?? "Random") (ID: \(categoryID?.description ?? "nil"))")
+                            selectedCategoryName = categoryName ?? "Random"
+                            showCategorySelection = false
+                            Task {
+                                await viewModel.loadQuestions(categoryID: categoryID)
+                            }
+                        }
+                    )
+                } else {
+                    switch viewModel.state {
+                    case .idle:
+                        Color.clear
+                    case .loading:
+                        QuizLoadingView()
+                    case .loaded:
+                        if viewModel.questions.isEmpty {
+                            VStack(spacing: 16) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.orange)
+                                Text("No questions available")
+                                    .font(.headline)
+                                Text("Try selecting a different category")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Button("Go Back") {
+                                    showCategorySelection = true
+                                    viewModel.reset()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(.purple)
+                            }
+                            .padding()
+                        } else {
+                            // ✅ Display the question - using a simple view to avoid cycles
+                            QuizQuestionView(
+                                question: viewModel.currentQuestion!,
+                                viewModel: viewModel
+                            )
+                            .id(viewModel.currentIndex) // ✅ Only refresh when index changes
+                        }
+                    case .finished:
+                        QuizFinishedView(
+                            score: viewModel.score,
+                            maxStreak: viewModel.streak,
+                            totalQuestions: viewModel.questions.count,
+                            onPlayAgain: {
+                                hasRecordedSession = false
+                                showCategorySelection = true
+                                viewModel.reset()
+                            },
+                            onHome: { dismiss() }
                         )
                     }
                 }
-                .padding(.horizontal)
-                
-                if viewModel.showFeedback {
-                    Text(viewModel.feedbackMessage)
-                        .font(.headline)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                
-                Spacer()
             }
-            .padding(.top, 20)
-        } else {
-            QuizLoadingView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
-    
-    private func answerState(for answer: String, question: Question) -> AnswerState {
-        guard viewModel.isAnswering else { return .none }
-        if answer == question.correct_answer {
-            return .correct
+        .navigationBarBackButtonHidden(false)
+        .onChange(of: viewModel.state) { oldState, newState in
+            print("🟣 State changed from: \(oldState) to: \(newState)")
+            if newState == .finished {
+                recordSessionIfNeeded()
+            }
         }
-        if answer == viewModel.selectedAnswer {
-            return .wrong
+        .alert("Level Up! 🎉", isPresented: $viewModel.showLevelUp) {
+            Button("Continue") {
+                viewModel.showLevelUp = false
+            }
+        } message: {
+            Text(viewModel.levelUpMessage)
         }
-        return .none
-    }
-    
-    private func startQuiz() async {
-        hasRecordedSession = false
-        await viewModel.loadQuestions()
+        .alert("Error", isPresented: $viewModel.showError) {
+            Button("Retry") {
+                Task {
+                    await viewModel.loadQuestions(categoryID: viewModel.selectedCategoryID)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                showCategorySelection = true
+                viewModel.reset()
+            }
+        } message: {
+            Text(viewModel.errorMessage)
+        }
     }
     
     private func recordSessionIfNeeded() {
@@ -125,40 +211,413 @@ struct QuizRushView: View {
             longitude: locationService.currentLocation?.coordinate.longitude
         )
         statsVM.addSession(session)
+        print("🏆 Quiz Rush session recorded: \(viewModel.score)")
     }
 }
 
-// MARK: - Question Progress View
-struct QuestionProgressView: View {
-    let current: Int
-    let total: Int
-    let streak: Int
+// MARK: - Quiz Question View (Simplified to prevent cycles)
+struct QuizQuestionView: View {
+    let question: Question
+    @ObservedObject var viewModel: QuizRushVM
     
     var body: some View {
-        HStack {
-            Text("Question \(current + 1) of \(total)")
-                .font(.headline)
+        VStack(spacing: 20) {
+            // Progress
+            HStack {
+                Text("Question \(viewModel.currentIndex + 1) of \(viewModel.totalQuestions)")
+                    .font(.headline)
+                Spacer()
+                if viewModel.streak > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .foregroundColor(.orange)
+                        Text("\(viewModel.streak)")
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.orange)
+                }
+            }
+            .padding(.horizontal)
+            
+            // Question Card
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(question.category.decodedHTML)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.1))
+                        .cornerRadius(8)
+                    
+                    Text(question.difficulty.capitalized)
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(difficultyColor.opacity(0.2))
+                        .cornerRadius(8)
+                        .foregroundColor(difficultyColor)
+                }
+                
+                Text(question.question.decodedHTML)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, 8)
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+            .padding(.horizontal)
+            
+            // ✅ Answer Buttons
+            VStack(spacing: 12) {
+                ForEach(question.allAnswers, id: \.self) { answer in
+                    QuizAnswerButton(
+                        text: answer.decodedHTML,
+                        isSelected: viewModel.selectedAnswer == answer,
+                        state: getAnswerState(for: answer),
+                        isDisabled: viewModel.isAnswering || viewModel.showFeedback
+                    ) {
+                        if !viewModel.isAnswering && !viewModel.showFeedback {
+                            viewModel.selectAnswer(answer)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal)
+            
+            // ✅ Feedback
+            if viewModel.showFeedback {
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: viewModel.answerState == .correct ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
+                        
+                        Text(viewModel.feedbackMessage)
+                            .font(.headline)
+                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        viewModel.answerState == .correct ?
+                            Color.green.opacity(0.1) :
+                            Color.red.opacity(0.1)
+                    )
+                    .cornerRadius(12)
+                    
+                    if viewModel.answerState == .wrong {
+                        Text("Correct Answer: \(question.correct_answer.decodedHTML)")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                            .padding(.horizontal)
+                            .padding(.vertical, 8)
+                            .background(Color.green.opacity(0.1))
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            
+            // Level Progress
+            VStack(spacing: 4) {
+                HStack {
+                    Text("Level Progress")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(viewModel.currentIndex + 1)/\(viewModel.totalQuestions)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(height: 4)
+                            .cornerRadius(2)
+                        
+                        Rectangle()
+                            .fill(
+                                LinearGradient(
+                                    colors: levelGradientColors,
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * viewModel.levelProgress, height: 4)
+                            .cornerRadius(2)
+                            .animation(.easeInOut(duration: 0.3), value: viewModel.levelProgress)
+                    }
+                }
+                .frame(height: 4)
+            }
+            .padding(.horizontal)
+            
+            Spacer(minLength: 20)
+        }
+        .padding(.vertical)
+        .onAppear {
+            print("✅ QuizQuestionView appeared with question: \(question.question.prefix(50))")
+        }
+    }
+    
+    private var difficultyColor: Color {
+        switch question.difficulty {
+        case "easy": return .green
+        case "medium": return .orange
+        default: return .red
+        }
+    }
+    
+    private var levelGradientColors: [Color] {
+        switch viewModel.currentLevel {
+        case .easy:
+            return [.green, .green.opacity(0.5)]
+        case .medium:
+            return [.orange, .orange.opacity(0.5)]
+        case .hard:
+            return [.red, .red.opacity(0.5)]
+        }
+    }
+    
+    private func getAnswerState(for answer: String) -> AnswerState {
+        if viewModel.isAnswering || viewModel.showFeedback {
+            if answer == question.correct_answer {
+                return .correct
+            }
+            if viewModel.selectedAnswer == answer && viewModel.answerState == .wrong {
+                return .wrong
+            }
+        }
+        
+        if viewModel.selectedAnswer == answer && !viewModel.showFeedback {
+            return viewModel.answerState
+        }
+        return .none
+    }
+}
+
+// MARK: - Quiz Answer Button
+struct QuizAnswerButton: View {
+    let text: String
+    let isSelected: Bool
+    let state: AnswerState
+    let isDisabled: Bool
+    let action: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(text)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .multilineTextAlignment(.center)
+                
+                Spacer()
+                
+                if state == .correct {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.title3)
+                } else if state == .wrong {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.red)
+                        .font(.title3)
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(backgroundColor)
+            .foregroundColor(foregroundColor)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(borderColor, lineWidth: 2)
+            )
+            .scaleEffect(isHovered && !isDisabled && state == .none ? 1.03 : 1.0)
+            .shadow(
+                color: isHovered && !isDisabled && state == .none ? Color.purple.opacity(0.3) : .clear,
+                radius: isHovered && !isDisabled && state == .none ? 10 : 0
+            )
+        }
+        .disabled(isDisabled || state != .none)
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
+        .animation(.easeInOut(duration: 0.2), value: state)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+    }
+    
+    private var backgroundColor: Color {
+        switch state {
+        case .correct:
+            return Color.green.opacity(0.2)
+        case .wrong:
+            return Color.red.opacity(0.2)
+        default:
+            if isSelected {
+                return Color.purple.opacity(0.2)
+            }
+            return isHovered ? Color.purple.opacity(0.1) : Color.gray.opacity(0.08)
+        }
+    }
+    
+    private var foregroundColor: Color {
+        switch state {
+        case .correct:
+            return .green
+        case .wrong:
+            return .red
+        default:
+            return isSelected ? .purple : .primary
+        }
+    }
+    
+    private var borderColor: Color {
+        switch state {
+        case .correct:
+            return .green
+        case .wrong:
+            return .red
+        default:
+            if isSelected {
+                return .purple
+            }
+            return isHovered ? Color.purple.opacity(0.4) : Color.clear
+        }
+    }
+}
+
+// MARK: - Category Selection View
+struct CategorySelectionView: View {
+    let categories: [TriviaCategory]
+    let onCategorySelected: (Int?, String?) -> Void
+    
+    @State private var selectedCategory: Int?
+    @State private var selectedCategoryName: String?
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            VStack(spacing: 8) {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.purple)
+                
+                Text("Choose a Category")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text("Select a topic for your quiz")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 20)
+            
+            Divider()
+                .padding(.horizontal)
+            
+            ScrollView {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 12) {
+                    CategoryButton(
+                        title: "🎲 Random",
+                        subtitle: "Surprise me!",
+                        isSelected: selectedCategory == nil,
+                        color: .purple
+                    ) {
+                        selectedCategory = nil
+                        selectedCategoryName = nil
+                        onCategorySelected(nil, "Random")
+                    }
+                    
+                    ForEach(categories) { category in
+                        CategoryButton(
+                            title: category.name,
+                            subtitle: "",
+                            isSelected: selectedCategory == category.id,
+                            color: categoryColor(for: category.id)
+                        ) {
+                            selectedCategory = category.id
+                            selectedCategoryName = category.name
+                            onCategorySelected(category.id, category.name)
+                        }
+                    }
+                }
+                .padding()
+            }
             
             Spacer()
-            
-            if streak > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "flame.fill")
-                        .foregroundColor(.orange)
-                    Text("\(streak)")
-                        .fontWeight(.semibold)
+        }
+        .background(Color(.systemBackground))
+    }
+    
+    private func categoryColor(for id: Int) -> Color {
+        let colors: [Color] = [.blue, .green, .orange, .pink, .purple, .red, .teal, .indigo, .mint, .cyan, .yellow, .brown]
+        return colors[id % colors.count]
+    }
+}
+
+// MARK: - Category Button
+struct CategoryButton: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+    
+    @State private var isHovered = false
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(isSelected ? .white : .primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
                 }
-                .foregroundColor(.orange)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(isSelected ? color : color.opacity(0.12))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? color : Color.clear, lineWidth: 2)
+            )
+            .scaleEffect(isHovered && !isSelected ? 1.02 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
             }
         }
     }
 }
 
-
-// MARK: - Loading View
+// MARK: - Quiz Loading View
 struct QuizLoadingView: View {
     var body: some View {
         VStack(spacing: 20) {
+            Spacer()
             ProgressView()
                 .scaleEffect(1.5)
             Text("Loading Questions...")
@@ -167,51 +626,13 @@ struct QuizLoadingView: View {
             Text("Fetching from Open Trivia DB")
                 .font(.caption)
                 .foregroundColor(.secondary)
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-// MARK: - Error View
-struct QuizErrorView: View {
-    let error: Error
-    let onRetry: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 50))
-                .foregroundColor(.orange)
-            
-            Text("Oops! Something went wrong")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text(error.localizedDescription)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
-            Button(action: onRetry) {
-                HStack {
-                    Image(systemName: "arrow.clockwise")
-                    Text("Try Again")
-                }
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .cornerRadius(10)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
-    }
-}
-
-// MARK: - Finished View
+// MARK: - Quiz Finished View
 struct QuizFinishedView: View {
     let score: Int
     let maxStreak: Int
@@ -279,5 +700,13 @@ struct QuizFinishedView: View {
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+    }
+}
+
+#Preview {
+    NavigationStack {
+        QuizRushView()
+            .environmentObject(StatsViewModel())
+            .environmentObject(LocationService())
     }
 }

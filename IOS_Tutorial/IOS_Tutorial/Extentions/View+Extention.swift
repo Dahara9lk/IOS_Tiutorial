@@ -10,7 +10,7 @@ import UIKit
 
 extension String {
     var decodedHTML: String {
-        guard let data = data(using: .utf8) else { return self }
+        guard let data = self.data(using: .utf8) else { return self }
         
         let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
             .documentType: NSAttributedString.DocumentType.html,
