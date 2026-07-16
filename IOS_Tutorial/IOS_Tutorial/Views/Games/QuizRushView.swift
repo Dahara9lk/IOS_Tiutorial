@@ -409,7 +409,7 @@ struct QuizQuestionView: View {
             VStack(spacing: 20) {
                 // Progress
                 HStack {
-                    Text("QUESTION \(viewModel.currentIndex + 1)")
+                    Text("Question \(viewModel.currentIndex + 1)")
                         .font(.system(.headline, design: .monospaced))
                         .fontWeight(.bold)
                         .foregroundColor(.white.opacity(0.8))
@@ -436,7 +436,7 @@ struct QuizQuestionView: View {
                 // Question Card
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text(question.category.decodedHTML.uppercased())
+                        Text(question.category.decodedHTML)
                             .font(.system(.caption, design: .monospaced))
                             .fontWeight(.bold)
                             .padding(.horizontal, 12)
@@ -559,7 +559,7 @@ struct QuizQuestionView: View {
                                 .shadow(color: .yellow.opacity(0.5), radius: 5)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("CORRECT ANSWER:")
+                                Text("Correct Answer:")
                                     .font(.system(.caption, design: .monospaced))
                                     .fontWeight(.bold)
                                     .foregroundColor(.white.opacity(0.6))
@@ -589,7 +589,7 @@ struct QuizQuestionView: View {
                 // Level Progress Bar
                 VStack(spacing: 4) {
                     HStack {
-                        Text("LEVEL PROGRESS")
+                        Text("Level Progress")
                             .font(.system(.caption2, design: .monospaced))
                             .fontWeight(.bold)
                             .foregroundColor(.white.opacity(0.4))
@@ -714,12 +714,12 @@ struct GameAnswerButton: View {
                 
                 if state == .correct {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.white)
                         .font(.title3)
                         .transition(.scale)
                 } else if state == .wrong {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
+                        .foregroundColor(.white)
                         .font(.title3)
                         .transition(.scale)
                 }
@@ -759,9 +759,9 @@ struct GameAnswerButton: View {
     private var backgroundColor: Color {
         switch state {
         case .correct:
-            return Color.green.opacity(0.2)
+            return .green
         case .wrong:
-            return Color.red.opacity(0.2)
+            return .red
         default:
             if isSelected {
                 return Color.cyan.opacity(0.2)
@@ -772,10 +772,8 @@ struct GameAnswerButton: View {
     
     private var foregroundColor: Color {
         switch state {
-        case .correct:
-            return .green
-        case .wrong:
-            return .red
+        case .correct, .wrong:
+            return .white
         default:
             return isSelected ? .cyan : .white
         }
