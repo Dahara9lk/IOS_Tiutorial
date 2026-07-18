@@ -13,7 +13,6 @@ struct LightItUpView: View {
     @EnvironmentObject var statsVM: StatsViewModel
     @EnvironmentObject var locationService: LocationService
     
-    // Storage of the App
     @AppStorage("lightItUpHighScore") private var highScore = 0
     
     @State private var cards: [Card] = []
@@ -31,46 +30,57 @@ struct LightItUpView: View {
     
     let durationOptions = [30, 60, 90]
     
-    //Body
     var body: some View {
-        VStack {
-            // Header
-            HStack {
-                Spacer()
-                
-                Text("Light It Up")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Button(action: { showSettings.toggle() }) {
-                    Image(systemName: "gear")
-                        .font(.title2)
-                }
-            }
-            .padding()
+        ZStack {
+            // ✅ Theme Background
+            LinearGradient.mainGradient
+                .ignoresSafeArea()
             
-            if isGameActive {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Spacer()
+                    
+                    Text("💡 LIGHT IT UP")
+                        .font(.system(.headline, design: .monospaced))
+                        .fontWeight(.black)
+                        .foregroundColor(.orange)
+                        .shadow(color: .orange.opacity(0.5), radius: 5)
+                    
+                    Spacer()
+                    
+                    Button(action: { showSettings.toggle() }) {
+                        Image(systemName: "gear")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                    }
+                }
+                .padding()
+                
                 // Stats
                 HStack {
                     VStack {
-                        Text("Score")
-                            .font(.caption)
+                        Text("SCORE")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.4))
                         Text("\(score)")
-                            .font(.title2)
+                            .font(.system(.title2, design: .monospaced))
                             .fontWeight(.bold)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.yellow)
+                            .shadow(color: .yellow.opacity(0.3), radius: 5)
                     }
                     
                     Spacer()
                     
                     VStack {
-                        Text("Lives")
-                            .font(.caption)
+                        Text("LIVES")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.4))
                         HStack {
                             ForEach(0..<3, id: \.self) { index in
                                 Image(systemName: index < lives ? "heart.fill" : "heart")
-                                    .foregroundColor(.red)
+                                    .foregroundColor(index < lives ? .red : .gray)
+                                    .font(.title2)
                             }
                         }
                     }
@@ -78,29 +88,40 @@ struct LightItUpView: View {
                     Spacer()
                     
                     VStack {
-                        Text("Time")
-                            .font(.caption)
+                        Text("TIME")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.4))
                         Text("\(timeRemaining)s")
-                            .font(.title2)
+                            .font(.system(.title2, design: .monospaced))
                             .fontWeight(.bold)
-                            .foregroundColor(timeRemaining <= 10 ? .red : .primary)
+                            .foregroundColor(timeRemaining <= 10 ? .red : .white)
                     }
                 }
                 .padding(.horizontal)
+                .padding(.vertical, 10)
                 
                 // Level Indicator
-                Text("Level \(currentLevel.rawValue)")
-                    .font(.headline)
+                Text("LEVEL \(currentLevel.rawValue)")
+                    .font(.system(.headline, design: .monospaced))
+                    .fontWeight(.black)
                     .foregroundColor(currentLevel.glowColor)
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 15)
-                    .background(currentLevel.glowColor.opacity(0.2))
-                    .cornerRadius(10)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(currentLevel.glowColor.opacity(0.15))
+                            .overlay(
+                                Capsule()
+                                    .stroke(currentLevel.glowColor.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                    .shadow(color: currentLevel.glowColor.opacity(0.3), radius: 10)
+                    .padding(.vertical, 8)
                 
-                // Grid - ✅ Using LightItUpCardView from CardView.swift
+                // Grid
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: currentLevel.columns), spacing: 8) {
                     ForEach(cards) { card in
-                        GameCardView(card: card, level: currentLevel)  // ✅ Updated name
+                        LightItUpGameCard(card: card, level: currentLevel)
                             .onTapGesture {
                                 handleTap(card: card)
                             }
@@ -108,39 +129,28 @@ struct LightItUpView: View {
                 }
                 .padding()
                 .frame(maxHeight: .infinity)
-            } else if !showGameOver {
-                Spacer()
                 
-                VStack(spacing: 20) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(.yellow)
-                        .shadow(color: .yellow, radius: 10)
-                    
-                    Text("Ready to Light It Up?")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Tap cards when they light up. Don't let your lives run out!")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                    
+                // Start Button
+                if !isGameActive && !showGameOver {
                     Button(action: startGame) {
-                        Text("Start Game")
-                            .font(.title3)
-                            .fontWeight(.semibold)
+                        Text("🚀 START")
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.bold)
                             .foregroundColor(.white)
-                            .frame(width: 200)
+                            .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.green)
-                            .cornerRadius(15)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color.orange)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                                    )
+                            )
+                            .shadow(color: .orange.opacity(0.3), radius: 10)
                     }
-                    .padding(.top, 10)
+                    .padding()
                 }
-                
-                Spacer()
             }
         }
         .sheet(isPresented: $showSettings) {
@@ -152,12 +162,80 @@ struct LightItUpView: View {
                     LevelUpOverlay(level: currentLevel)
                 }
                 if showGameOver {
-                    ResultView(
-                        score: score,
-                        mode: .lightItUp,
-                        onPlayAgain: startGame,
-                        onHome: { dismiss() }
+                    // ✅ Game Over with Theme
+                    VStack(spacing: 25) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.orange)
+                            .shadow(color: .orange.opacity(0.5), radius: 20)
+                        
+                        Text("GAME OVER!")
+                            .font(.system(.largeTitle, design: .monospaced))
+                            .fontWeight(.black)
+                            .foregroundColor(.white)
+                        
+                        Text("SCORE: \(score)")
+                            .font(.system(.title, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.yellow)
+                            .shadow(color: .yellow.opacity(0.3), radius: 5)
+                        
+                        if score > highScore {
+                            Text("🏆 NEW HIGH SCORE!")
+                                .font(.system(.headline, design: .monospaced))
+                                .fontWeight(.bold)
+                                .foregroundColor(.green)
+                                .shadow(color: .green.opacity(0.3), radius: 5)
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Button(action: startGame) {
+                                Text("🔄 REPLAY")
+                                    .font(.system(.body, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 30)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .fill(Color.orange)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                                            )
+                                    )
+                                    .shadow(color: .orange.opacity(0.3), radius: 10)
+                            }
+                            
+                            Button(action: { dismiss() }) {
+                                Text("🏠 HOME")
+                                    .font(.system(.body, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 30)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .fill(Color.white.opacity(0.05))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                            )
+                                    )
+                            }
+                        }
+                    }
+                    .padding(30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.black.opacity(0.9))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                            )
                     )
+                    .padding(30)
+                    .transition(.scale.combined(with: .opacity))
                 }
             }
         )
@@ -192,7 +270,6 @@ struct LightItUpView: View {
         litTimer = nil
         isGameActive = false
         
-        // Turn off all lights
         for i in cards.indices {
             cards[i].isLit = false
         }
@@ -203,7 +280,6 @@ struct LightItUpView: View {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             timeRemaining -= 1
             
-            // Check level progression
             let newLevel = Level.from(time: selectedDuration - timeRemaining)
             if newLevel != currentLevel {
                 withAnimation(.spring()) {
@@ -233,12 +309,10 @@ struct LightItUpView: View {
     }
     
     private func lightUpCards() {
-        // Turn off all cards
         for i in cards.indices {
             cards[i].isLit = false
         }
         
-        // Pick cards to light up
         let availableIndices = cards.indices.filter { !cards[$0].isLit }
         let countToLight = min(currentLevel.litCount, availableIndices.count)
         
@@ -256,18 +330,15 @@ struct LightItUpView: View {
         guard isGameActive else { return }
         
         if card.isLit {
-            // Correct tap
             score += 1
             withAnimation(.easeOut(duration: 0.2)) {
                 if let index = cards.firstIndex(where: { $0.id == card.id }) {
                     cards[index].isLit = false
                 }
             }
-            // Haptic feedback
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
         } else {
-            // Wrong tap - lose a life
             lives -= 1
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.impactOccurred()
@@ -281,12 +352,10 @@ struct LightItUpView: View {
     private func endGame() {
         stopGame()
         
-        // Update high score
         if score > highScore {
             highScore = score
         }
         
-        // Record session
         let session = GameSession(
             mode: .lightItUp,
             score: score,
@@ -296,6 +365,26 @@ struct LightItUpView: View {
         statsVM.addSession(session)
         
         showGameOver = true
+    }
+}
+
+// MARK: - Light It Up Card
+struct LightItUpGameCard: View {
+    let card: Card
+    let level: Level
+    
+    var body: some View {
+        Rectangle()
+            .fill(card.isLit ? level.glowColor : Color.white.opacity(0.05))
+            .aspectRatio(1, contentMode: .fit)
+            .cornerRadius(12)
+            .scaleEffect(card.isLit ? 1.05 : 1.0)
+            .animation(.easeInOut(duration: 0.3), value: card.isLit)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(card.isLit ? level.glowColor : Color.white.opacity(0.1), lineWidth: card.isLit ? 3 : 1)
+                    .shadow(color: card.isLit ? level.glowColor.opacity(0.5) : .clear, radius: card.isLit ? 10 : 0)
+            )
     }
 }
 

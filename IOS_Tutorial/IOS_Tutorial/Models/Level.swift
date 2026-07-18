@@ -12,19 +12,19 @@ enum Level: Int {
     
     var columns: Int {
         switch self {
-        case .l1: return 3
-        case .l2: return 4
-        case .l3: return 6
-        case .l4: return 9
+        case .l1: return 2
+        case .l2: return 3
+        case .l3: return 4
+        case .l4: return 4
         }
     }
     
     var rows: Int {
         switch self {
-        case .l1: return 1
-        case .l2: return 1
-        case .l3: return 2
-        case .l4: return 3
+        case .l1: return 2
+        case .l2: return 3
+        case .l3: return 4
+        case .l4: return 5
         }
     }
     
@@ -34,15 +34,20 @@ enum Level: Int {
     
     var litDuration: Double {
         switch self {
-        case .l1: return 1.5
-        case .l2: return 1.2
-        case .l3: return 1.0
-        case .l4: return 0.8
+        case .l1: return 1.2
+        case .l2: return 0.9
+        case .l3: return 0.7
+        case .l4: return 0.5
         }
     }
     
     var litCount: Int {
-        self == .l4 ? 2 : 1
+        switch self {
+        case .l1: return 1
+        case .l2: return 1
+        case .l3: return 2
+        case .l4: return 3
+        }
     }
     
     var glowColor: Color {

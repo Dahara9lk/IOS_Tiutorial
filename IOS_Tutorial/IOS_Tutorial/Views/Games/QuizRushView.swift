@@ -23,6 +23,10 @@ struct QuizRushView: View {
     @State private var hasRecordedSession = false
     @State private var showCategorySelection = true
     @State private var selectedCategoryName = "Random"
+    @State private var showPopup = false
+    @State private var popupMessage = ""
+    @State private var popupColor = Color.green
+    @State private var correctAnswerText = ""
     
     let categories: [TriviaCategory] = [
         TriviaCategory(id: 9, name: "General Knowledge"),
@@ -52,134 +56,178 @@ struct QuizRushView: View {
     ]
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Spacer()
-                
-                Text("Quiz Rush")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                
-                Spacer()
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
-                    Text("\(viewModel.score)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.purple)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.purple.opacity(0.1)))
-            }
-            .padding()
-            .background(Color(.systemBackground))
+        ZStack {
+            LinearGradient.mainGradient
+                .ignoresSafeArea()
             
-            Divider()
-            
-            // Level & Category Info
-            if viewModel.state == .loaded && !showCategorySelection {
+            VStack(spacing: 0) {
+                // Header
                 HStack {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bolt.fill")
-                            .foregroundColor(viewModel.currentLevel.color)
-                            .font(.caption)
-                        Text("Level \(viewModel.currentLevel.rawValue)")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(viewModel.currentLevel.color)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(viewModel.currentLevel.color.opacity(0.15))
-                    .cornerRadius(8)
+                    Spacer()
+                    
+                    Text("⚡ QUIZ RUSH")
+                        .font(.system(.title3, design: .monospaced))
+                        .fontWeight(.black)
+                        .foregroundColor(.cyan)
+                        .shadow(color: .cyan.opacity(0.8), radius: 8)
                     
                     Spacer()
                     
-                    Text("Category: \(selectedCategoryName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 6)
-            }
-            
-            // ✅ CONTENT - This is where the magic happens
-            Group {
-                if showCategorySelection && viewModel.state != .finished {
-                    CategorySelectionView(
-                        categories: categories,
-                        onCategorySelected: { categoryID, categoryName in
-                            print("🟣 Category selected: \(categoryName ?? "Random") (ID: \(categoryID?.description ?? "nil"))")
-                            selectedCategoryName = categoryName ?? "Random"
-                            showCategorySelection = false
-                            Task {
-                                await viewModel.loadQuestions(categoryID: categoryID)
-                            }
-                        }
+                    HStack(spacing: 8) {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.yellow)
+                            .shadow(color: .yellow, radius: 4)
+                        Text("\(viewModel.score)")
+                            .font(.system(.title2, design: .monospaced))
+                            .fontWeight(.black)
+                            .foregroundColor(.yellow)
+                            .shadow(color: .yellow.opacity(0.5), radius: 6)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.05))
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.yellow.opacity(0.6), lineWidth: 2)
+                                    .shadow(color: .yellow, radius: 2)
+                            )
                     )
-                } else {
-                    switch viewModel.state {
-                    case .idle:
-                        Color.clear
-                    case .loading:
-                        QuizLoadingView()
-                    case .loaded:
-                        if viewModel.questions.isEmpty {
-                            VStack(spacing: 16) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 50))
-                                    .foregroundColor(.orange)
-                                Text("No questions available")
-                                    .font(.headline)
-                                Text("Try selecting a different category")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Button("Go Back") {
+                }
+                .padding()
+                
+                Divider()
+                    .background(Color.purple.opacity(0.3))
+                
+                if viewModel.state == .loaded && !showCategorySelection {
+                    HStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: "bolt.fill")
+                                .foregroundColor(viewModel.currentLevel.color)
+                                .font(.caption)
+                                .shadow(color: viewModel.currentLevel.color.opacity(0.5), radius: 3)
+                            Text("LEVEL \(viewModel.currentLevel.rawValue)")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.05))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(viewModel.currentLevel.color, lineWidth: 2)
+                                        .shadow(color: viewModel.currentLevel.color, radius: 3)
+                                )
+                        )
+                        
+                        Spacer()
+                        
+                        Text("🎯 \(selectedCategoryName)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+                
+                Group {
+                    if showCategorySelection && viewModel.state != .finished {
+                        CategorySelectionView(
+                            categories: categories,
+                            onCategorySelected: { categoryID, categoryName in
+                                selectedCategoryName = categoryName ?? "Random"
+                                showCategorySelection = false
+                                Task {
+                                    await viewModel.loadQuestions(categoryID: categoryID)
+                                }
+                            }
+                        )
+                    } else {
+                        switch viewModel.state {
+                        case .idle:
+                            Color.clear
+                        case .loading:
+                            QuizLoadingView()
+                        case .loaded:
+                            if viewModel.questions.isEmpty {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.system(size: 50))
+                                        .foregroundColor(.orange)
+                                    Text("No questions available")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Text("Try selecting a different category")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.6))
+                                    Button("Go Back") {
+                                        showCategorySelection = true
+                                        viewModel.reset()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(.purple)
+                                }
+                                .padding()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                QuizQuestionView(
+                                    question: viewModel.currentQuestion!,
+                                    viewModel: viewModel,
+                                    showPopup: $showPopup,
+                                    popupMessage: $popupMessage,
+                                    popupColor: $popupColor,
+                                    correctAnswerText: $correctAnswerText
+                                )
+                                .id(viewModel.currentIndex)
+                            }
+                        case .finished:
+                            QuizFinishedView(
+                                score: viewModel.score,
+                                maxStreak: viewModel.streak,
+                                totalQuestions: viewModel.questions.count,
+                                onPlayAgain: {
+                                    hasRecordedSession = false
                                     showCategorySelection = true
                                     viewModel.reset()
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .tint(.purple)
-                            }
-                            .padding()
-                        } else {
-                            // ✅ Display the question - using a simple view to avoid cycles
-                            QuizQuestionView(
-                                question: viewModel.currentQuestion!,
-                                viewModel: viewModel
+                                },
+                                onHome: { dismiss() }
                             )
-                            .id(viewModel.currentIndex) // ✅ Only refresh when index changes
                         }
-                    case .finished:
-                        QuizFinishedView(
-                            score: viewModel.score,
-                            maxStreak: viewModel.streak,
-                            totalQuestions: viewModel.questions.count,
-                            onPlayAgain: {
-                                hasRecordedSession = false
-                                showCategorySelection = true
-                                viewModel.reset()
-                            },
-                            onHome: { dismiss() }
-                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    if !showCategorySelection {
+                        showCategorySelection = true
+                        viewModel.reset()
+                    } else {
+                        dismiss()
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                        Text("Back")
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationBarBackButtonHidden(false)
         .onChange(of: viewModel.state) { oldState, newState in
-            print("🟣 State changed from: \(oldState) to: \(newState)")
             if newState == .finished {
                 recordSessionIfNeeded()
             }
         }
-        .alert("Level Up! 🎉", isPresented: $viewModel.showLevelUp) {
-            Button("Continue") {
+        .alert("🎉 Level Up!", isPresented: $viewModel.showLevelUp) {
+            Button("Continue!") {
                 viewModel.showLevelUp = false
             }
         } message: {
@@ -215,154 +263,385 @@ struct QuizRushView: View {
     }
 }
 
-// MARK: - Quiz Question View (Simplified to prevent cycles)
-struct QuizQuestionView: View {
-    let question: Question
-    @ObservedObject var viewModel: QuizRushVM
+// MARK: - Category Selection View
+struct CategorySelectionView: View {
+    let categories: [TriviaCategory]
+    let onCategorySelected: (Int?, String?) -> Void
+    
+    @State private var selectedCategory: Int?
+    @State private var selectedCategoryName: String?
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Progress
-            HStack {
-                Text("Question \(viewModel.currentIndex + 1) of \(viewModel.totalQuestions)")
-                    .font(.headline)
-                Spacer()
-                if viewModel.streak > 0 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .foregroundColor(.orange)
-                        Text("\(viewModel.streak)")
-                            .fontWeight(.semibold)
-                    }
-                    .foregroundColor(.orange)
-                }
-            }
-            .padding(.horizontal)
-            
-            // Question Card
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(question.category.decodedHTML)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.purple.opacity(0.1))
-                        .cornerRadius(8)
-                    
-                    Text(question.difficulty.capitalized)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(difficultyColor.opacity(0.2))
-                        .cornerRadius(8)
-                        .foregroundColor(difficultyColor)
-                }
-                
-                Text(question.question.decodedHTML)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .multilineTextAlignment(.center)
-                    .padding(.vertical, 8)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(Color(.systemBackground))
-            .cornerRadius(16)
-            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-            .padding(.horizontal)
-            
-            // ✅ Answer Buttons
+        VStack(spacing: 0) {
             VStack(spacing: 12) {
-                ForEach(question.allAnswers, id: \.self) { answer in
-                    QuizAnswerButton(
-                        text: answer.decodedHTML,
-                        isSelected: viewModel.selectedAnswer == answer,
-                        state: getAnswerState(for: answer),
-                        isDisabled: viewModel.isAnswering || viewModel.showFeedback
+                Image(systemName: "gamecontroller.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.purple)
+                    .shadow(color: .purple.opacity(0.5), radius: 15)
+                
+                Text("SELECT CATEGORY")
+                    .font(.system(.title3, design: .monospaced))
+                    .fontWeight(.black)
+                    .foregroundColor(.cyan)
+                    .shadow(color: .cyan.opacity(0.8), radius: 8)
+                
+                Text("Choose your battle ground!")
+                    .font(.system(.subheadline, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+            .frame(maxWidth: .infinity)
+            
+            Divider()
+                .background(Color.purple.opacity(0.3))
+            
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 12) {
+                    GameCategoryButton(
+                        title: "🎲 Random",
+                        subtitle: "Surprise me!",
+                        isSelected: selectedCategory == nil,
+                        color: .purple
                     ) {
-                        if !viewModel.isAnswering && !viewModel.showFeedback {
-                            viewModel.selectAnswer(answer)
+                        selectedCategory = nil
+                        selectedCategoryName = nil
+                        onCategorySelected(nil, "Random")
+                    }
+                    
+                    ForEach(categories) { category in
+                        GameCategoryButton(
+                            title: category.name,
+                            subtitle: "",
+                            isSelected: selectedCategory == category.id,
+                            color: categoryColor(for: category.id)
+                        ) {
+                            selectedCategory = category.id
+                            selectedCategoryName = category.name
+                            onCategorySelected(category.id, category.name)
                         }
                     }
                 }
+                .padding()
             }
-            .padding(.horizontal)
-            
-            // ✅ Feedback
-            if viewModel.showFeedback {
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: viewModel.answerState == .correct ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
-                        
-                        Text(viewModel.feedbackMessage)
-                            .font(.headline)
-                            .foregroundColor(viewModel.answerState == .correct ? .green : .red)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        viewModel.answerState == .correct ?
-                            Color.green.opacity(0.1) :
-                            Color.red.opacity(0.1)
+            .safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: 100)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(Color.clear)
+    }
+    
+    private func categoryColor(for id: Int) -> Color {
+        let colors: [Color] = [.blue, .green, .orange, .pink, .purple, .red, .teal, .indigo, .mint, .cyan, .yellow, .brown]
+        return colors[id % colors.count]
+    }
+}
+
+// MARK: - Game Category Button
+struct GameCategoryButton: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(.subheadline, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(isSelected ? .white : .white.opacity(0.8))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(isSelected ? .white.opacity(0.8) : .white.opacity(0.4))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+        }
+        .buttonStyle(CategoryButtonStyle(isSelected: isSelected, color: color))
+    }
+}
+
+struct CategoryButtonStyle: ButtonStyle {
+    let isSelected: Bool
+    let color: Color
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isSelected ? color.opacity(0.3) : (configuration.isPressed ? color.opacity(0.15) : Color.white.opacity(0.03)))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? color : (configuration.isPressed ? color.opacity(0.5) : Color.white.opacity(0.05)), lineWidth: isSelected ? 2 : 1)
                     )
-                    .cornerRadius(12)
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : (isSelected ? 1.03 : 1.0))
+            .shadow(
+                color: configuration.isPressed || isSelected ? color.opacity(0.3) : .clear,
+                radius: configuration.isPressed || isSelected ? 10 : 0
+            )
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Quiz Question View
+struct QuizQuestionView: View {
+    let question: Question
+    @ObservedObject var viewModel: QuizRushVM
+    @Binding var showPopup: Bool
+    @Binding var popupMessage: String
+    @Binding var popupColor: Color
+    @Binding var correctAnswerText: String
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Progress
+                HStack {
+                    Text("Question \(viewModel.currentIndex + 1)")
+                        .font(.system(.headline, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white.opacity(0.8))
                     
-                    if viewModel.answerState == .wrong {
-                        Text("Correct Answer: \(question.correct_answer.decodedHTML)")
-                            .font(.subheadline)
-                            .foregroundColor(.green)
-                            .padding(.horizontal)
-                            .padding(.vertical, 8)
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(8)
+                    Spacer()
+                    
+                    if viewModel.streak > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.orange)
+                                .shadow(color: .orange.opacity(0.5), radius: 5)
+                            Text("\(viewModel.streak)x")
+                                .fontWeight(.bold)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    
+                    Text("/ \(viewModel.totalQuestions)")
+                        .font(.system(.headline, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.4))
+                }
+                .padding(.horizontal)
+                
+                // Question Card
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text(question.category.decodedHTML)
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.purple.opacity(0.2))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                            .foregroundColor(.purple)
+                        
+                        Text(question.difficulty.capitalized)
+                            .font(.system(.caption, design: .monospaced))
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(difficultyColor.opacity(0.2))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(difficultyColor.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                            .foregroundColor(difficultyColor)
+                    }
+                    
+                    Text(question.question.decodedHTML)
+                        .font(.system(.title3, design: .monospaced))
+                        .fontWeight(.bold)
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.white)
+                        .padding(.vertical, 8)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.cyan.opacity(0.5), lineWidth: 2)
+                        )
+                )
+                .shadow(color: .cyan.opacity(0.3), radius: 15)
+                .padding(.horizontal)
+                
+                // Answer Buttons
+                VStack(spacing: 12) {
+                    ForEach(question.allAnswers, id: \.self) { answer in
+                        GameAnswerButton(
+                            text: answer.decodedHTML,
+                            isSelected: viewModel.selectedAnswer == answer,
+                            state: getAnswerState(for: answer),
+                            isDisabled: viewModel.isAnswering || viewModel.showFeedback
+                        ) {
+                            if !viewModel.isAnswering && !viewModel.showFeedback {
+                                viewModel.selectAnswer(answer)
+                            }
+                        }
                     }
                 }
                 .padding(.horizontal)
-            }
-            
-            // Level Progress
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Level Progress")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(viewModel.currentIndex + 1)/\(viewModel.totalQuestions)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                
+                // Feedback with Correct Answer
+                if viewModel.showFeedback {
+                    VStack(spacing: 12) {
+                        if viewModel.answerState == .correct {
+                            // ✅ Correct feedback
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.green)
+                                Text("✅ CORRECT! +2 POINTS")
+                                    .font(.system(.headline, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.green.opacity(0.15))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                        } else {
+                            // ❌ Wrong feedback
+                            HStack {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.red)
+                                Text("❌ WRONG! -1 POINT")
+                                    .font(.system(.headline, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.red)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.red.opacity(0.15))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        
+                        // ✅ ALWAYS SHOW CORRECT ANSWER
+                        HStack {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.title2)
+                                .foregroundColor(.yellow)
+                                .shadow(color: .yellow.opacity(0.5), radius: 5)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Correct Answer:")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white.opacity(0.6))
+                                Text(question.correct_answer.decodedHTML)
+                                    .font(.system(.body, design: .monospaced))
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                                    .shadow(color: .green.opacity(0.3), radius: 3)
+                            }
+                            Spacer()
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.green.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .padding(.horizontal)
+                    .transition(.scale.combined(with: .opacity))
                 }
                 
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 4)
-                            .cornerRadius(2)
-                        
-                        Rectangle()
-                            .fill(
-                                LinearGradient(
-                                    colors: levelGradientColors,
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geometry.size.width * viewModel.levelProgress, height: 4)
-                            .cornerRadius(2)
-                            .animation(.easeInOut(duration: 0.3), value: viewModel.levelProgress)
+                // Level Progress Bar
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("Level Progress")
+                            .font(.system(.caption2, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white.opacity(0.4))
+                        Spacer()
+                        Text("\(viewModel.currentIndex + 1)/\(viewModel.totalQuestions)")
+                            .font(.system(.caption2, design: .monospaced))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white.opacity(0.4))
                     }
+                    
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.05))
+                                .frame(height: 6)
+                                .cornerRadius(3)
+                            
+                            Rectangle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: levelGradientColors,
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * viewModel.levelProgress, height: 6)
+                                .cornerRadius(3)
+                                .animation(.easeInOut(duration: 0.3), value: viewModel.levelProgress)
+                                .shadow(color: viewModel.currentLevel.color.opacity(0.5), radius: 5)
+                        }
+                    }
+                    .frame(height: 6)
                 }
-                .frame(height: 4)
+                .padding(.horizontal)
+                
+                Spacer(minLength: 20)
             }
-            .padding(.horizontal)
-            
-            Spacer(minLength: 20)
+            .padding(.vertical)
         }
-        .padding(.vertical)
-        .onAppear {
-            print("✅ QuizQuestionView appeared with question: \(question.question.prefix(50))")
+        .onChange(of: viewModel.showFeedback) { oldValue, newValue in
+            if newValue {
+                if viewModel.answerState == .correct {
+                    popupMessage = "✅ CORRECT! +2 POINTS"
+                    popupColor = .green
+                    correctAnswerText = ""
+                } else {
+                    popupMessage = "❌ WRONG! -1 POINT"
+                    popupColor = .red
+                    correctAnswerText = question.correct_answer.decodedHTML
+                }
+                showPopup = true
+            }
         }
     }
     
@@ -402,8 +681,8 @@ struct QuizQuestionView: View {
     }
 }
 
-// MARK: - Quiz Answer Button
-struct QuizAnswerButton: View {
+// MARK: - Game Answer Button
+struct GameAnswerButton: View {
     let text: String
     let isSelected: Bool
     let state: AnswerState
@@ -411,48 +690,68 @@ struct QuizAnswerButton: View {
     let action: () -> Void
     
     @State private var isHovered = false
+    @State private var isPressed = false
+    @State private var isFloating = false
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isPressed = false
+                action()
+            }
+        }) {
             HStack {
                 Text(text)
-                    .font(.body)
-                    .fontWeight(.medium)
+                    .font(.system(.body, design: .monospaced))
+                    .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(foregroundColor)
                 
                 Spacer()
                 
                 if state == .correct {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.white)
                         .font(.title3)
+                        .transition(.scale)
                 } else if state == .wrong {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
+                        .foregroundColor(.white)
                         .font(.title3)
+                        .transition(.scale)
                 }
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(backgroundColor)
-            .foregroundColor(foregroundColor)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(borderColor, lineWidth: 2)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(backgroundColor)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(borderColor, lineWidth: state != .none ? 2 : (isHovered ? 2 : 1))
+                    )
             )
-            .scaleEffect(isHovered && !isDisabled && state == .none ? 1.03 : 1.0)
+            .scaleEffect(isHovered && !isDisabled && state == .none ? 1.04 : (isPressed ? 0.96 : (isFloating && state == .none && !isDisabled ? 1.02 : 1.0)))
             .shadow(
-                color: isHovered && !isDisabled && state == .none ? Color.purple.opacity(0.3) : .clear,
-                radius: isHovered && !isDisabled && state == .none ? 10 : 0
+                color: (isHovered || isFloating) && !isDisabled && state == .none ? Color.cyan.opacity(0.2) : .clear,
+                radius: (isHovered || isFloating) && !isDisabled && state == .none ? 10 : 0
             )
         }
         .disabled(isDisabled || state != .none)
         .animation(.easeInOut(duration: 0.2), value: isHovered)
         .animation(.easeInOut(duration: 0.2), value: state)
+        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isPressed)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
+            }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                isFloating = true
             }
         }
     }
@@ -460,25 +759,23 @@ struct QuizAnswerButton: View {
     private var backgroundColor: Color {
         switch state {
         case .correct:
-            return Color.green.opacity(0.2)
+            return .green
         case .wrong:
-            return Color.red.opacity(0.2)
+            return .red
         default:
             if isSelected {
-                return Color.purple.opacity(0.2)
+                return Color.cyan.opacity(0.2)
             }
-            return isHovered ? Color.purple.opacity(0.1) : Color.gray.opacity(0.08)
+            return isHovered ? Color.cyan.opacity(0.08) : Color.white.opacity(0.03)
         }
     }
     
     private var foregroundColor: Color {
         switch state {
-        case .correct:
-            return .green
-        case .wrong:
-            return .red
+        case .correct, .wrong:
+            return .white
         default:
-            return isSelected ? .purple : .primary
+            return isSelected ? .cyan : .white
         }
     }
     
@@ -490,125 +787,9 @@ struct QuizAnswerButton: View {
             return .red
         default:
             if isSelected {
-                return .purple
+                return .cyan
             }
-            return isHovered ? Color.purple.opacity(0.4) : Color.clear
-        }
-    }
-}
-
-// MARK: - Category Selection View
-struct CategorySelectionView: View {
-    let categories: [TriviaCategory]
-    let onCategorySelected: (Int?, String?) -> Void
-    
-    @State private var selectedCategory: Int?
-    @State private var selectedCategoryName: String?
-    
-    var body: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 8) {
-                Image(systemName: "questionmark.circle.fill")
-                    .font(.system(size: 50))
-                    .foregroundColor(.purple)
-                
-                Text("Choose a Category")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("Select a topic for your quiz")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.top, 20)
-            
-            Divider()
-                .padding(.horizontal)
-            
-            ScrollView {
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 12) {
-                    CategoryButton(
-                        title: "🎲 Random",
-                        subtitle: "Surprise me!",
-                        isSelected: selectedCategory == nil,
-                        color: .purple
-                    ) {
-                        selectedCategory = nil
-                        selectedCategoryName = nil
-                        onCategorySelected(nil, "Random")
-                    }
-                    
-                    ForEach(categories) { category in
-                        CategoryButton(
-                            title: category.name,
-                            subtitle: "",
-                            isSelected: selectedCategory == category.id,
-                            color: categoryColor(for: category.id)
-                        ) {
-                            selectedCategory = category.id
-                            selectedCategoryName = category.name
-                            onCategorySelected(category.id, category.name)
-                        }
-                    }
-                }
-                .padding()
-            }
-            
-            Spacer()
-        }
-        .background(Color(.systemBackground))
-    }
-    
-    private func categoryColor(for id: Int) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .pink, .purple, .red, .teal, .indigo, .mint, .cyan, .yellow, .brown]
-        return colors[id % colors.count]
-    }
-}
-
-// MARK: - Category Button
-struct CategoryButton: View {
-    let title: String
-    let subtitle: String
-    let isSelected: Bool
-    let color: Color
-    let action: () -> Void
-    
-    @State private var isHovered = false
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(isSelected ? .white : .primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(isSelected ? color : color.opacity(0.12))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? color : Color.clear, lineWidth: 2)
-            )
-            .scaleEffect(isHovered && !isSelected ? 1.02 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovered = hovering
-            }
+            return isHovered ? Color.cyan.opacity(0.4) : Color.white.opacity(0.05)
         }
     }
 }
@@ -620,12 +801,14 @@ struct QuizLoadingView: View {
             Spacer()
             ProgressView()
                 .scaleEffect(1.5)
-            Text("Loading Questions...")
-                .font(.headline)
-                .foregroundColor(.secondary)
+                .tint(.purple)
+            Text("LOADING QUESTIONS...")
+                .font(.system(.headline, design: .monospaced))
+                .fontWeight(.bold)
+                .foregroundColor(.white.opacity(0.6))
             Text("Fetching from Open Trivia DB")
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.white.opacity(0.3))
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -643,63 +826,85 @@ struct QuizFinishedView: View {
     var body: some View {
         VStack(spacing: 25) {
             Image(systemName: "trophy.fill")
-                .font(.system(size: 60))
+                .font(.system(size: 70))
                 .foregroundColor(.yellow)
+                .shadow(color: .yellow.opacity(0.5), radius: 20)
             
-            Text("Quiz Complete!")
-                .font(.largeTitle)
+            Text("🏆 QUIZ COMPLETE!")
+                .font(.system(.largeTitle, design: .monospaced))
                 .fontWeight(.bold)
+                .foregroundColor(.white)
             
             VStack(spacing: 12) {
                 HStack {
-                    Text("Score:")
-                        .font(.headline)
+                    Text("SCORE:")
+                        .font(.system(.headline, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.6))
                     Text("\(score)")
-                        .font(.title)
+                        .font(.system(.title, design: .monospaced))
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.yellow)
+                        .shadow(color: .yellow.opacity(0.3), radius: 5)
                 }
                 
                 HStack {
-                    Text("Best Streak:")
-                        .font(.headline)
+                    Text("BEST STREAK:")
+                        .font(.system(.headline, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.6))
                     Text("\(maxStreak)")
-                        .font(.title2)
+                        .font(.system(.title2, design: .monospaced))
                         .fontWeight(.bold)
                         .foregroundColor(.orange)
+                        .shadow(color: .orange.opacity(0.3), radius: 5)
                 }
                 
                 Text("\(score)/\(totalQuestions)")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
+                    .font(.system(.headline, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.4))
             }
             
             VStack(spacing: 12) {
                 Button(action: onPlayAgain) {
-                    Text("Play Again")
-                        .fontWeight(.semibold)
+                    Text("🔄 PLAY AGAIN")
+                        .font(.system(.body, design: .monospaced))
+                        .fontWeight(.bold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
-                        .cornerRadius(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.purple)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.purple.opacity(0.5), lineWidth: 1)
+                                )
+                        )
+                        .shadow(color: .purple.opacity(0.4), radius: 10)
                 }
+                .buttonStyle(.plain)
                 
                 Button(action: onHome) {
-                    Text("Home")
-                        .fontWeight(.semibold)
-                        .foregroundColor(.blue)
+                    Text("🏠 HOME")
+                        .font(.system(.body, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.white.opacity(0.05))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                        )
                 }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
     }
 }
 
